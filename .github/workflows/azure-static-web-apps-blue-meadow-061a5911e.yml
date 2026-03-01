@@ -9,13 +9,21 @@ jobs:
     runs-on: ubuntu-latest
     name: Build And Deploy Job
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Clean git extraheader (kills the Azure warning)
+        run: |
+          git config --local --unset-all http.https://github.com/.extraheader || true
+          git config --local --unset-all url.https://github.com/.insteadOf || true
+
       - name: Build And Deploy
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_BLUE_MEADOW_061A5911E }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "/"           # ← root React app (critical fix)
+          app_location: "/"           # ← root React app
           api_location: ""            # ← no Functions yet
           output_location: "dist"     # ← Vite default
