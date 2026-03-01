@@ -5,3 +5,4 @@ __pycache__/
 .env
 secrets.toml
 node_modules/
+node_modules
