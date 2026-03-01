@@ -126,7 +126,7 @@ def send_email(smtp_host, smtp_port, smtp_mode, email_address, email_password, t
         server.send_message(msg)
 
 
-  def test_mail_login(imap_host, imap_port, smtp_host, smtp_port, smtp_mode, email_address, email_password):
+def test_mail_login(imap_host, imap_port, smtp_host, smtp_port, smtp_mode, email_address, email_password):
     result = {
       "imap_ok": False,
       "smtp_ok": False,

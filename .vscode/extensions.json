@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        "teamsdevapp.vscode-ai-foundry",
+        "ms-python.vscode-pylance",
+        "github.copilot-chat",
+        "github.codespaces"
+    ]
+}
