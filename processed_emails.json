@@ -1,0 +1,13 @@
+[
+  {
+    "path": "test_output/2024/02/test@example.com/sample.eml",
+    "sender": "test@example.com",
+    "subject": "Hello",
+    "category": "ULU-HiTech",
+    "date": "2024-02-21T10:00:00-08:00",
+    "sentiment": "neutral",
+    "urgency": "medium",
+    "action_needed": true,
+    "summary": "A test email"
+  }
+]

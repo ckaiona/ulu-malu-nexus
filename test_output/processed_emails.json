@@ -1,0 +1,24 @@
+[
+  {
+    "path": "test_output/2024/02/test@example.com/202402_Test Email for EML Organizer_4ffe77ff54f9aa42.eml",
+    "sender": "test@example.com",
+    "subject": "Test Email for EML Organizer",
+    "category": "Uncategorized",
+    "date": "2024-02-21T10:00:00-08:00",
+    "sentiment": "neutral",
+    "urgency": "medium",
+    "action_needed": false,
+    "summary": ""
+  },
+  {
+    "path": "test_output/2024/02/another@example.com/202402_Another Test Email_28875c92bc98aac6.eml",
+    "sender": "another@example.com",
+    "subject": "Another Test Email",
+    "category": "Uncategorized",
+    "date": "2024-02-21T11:00:00-08:00",
+    "sentiment": "neutral",
+    "urgency": "medium",
+    "action_needed": false,
+    "summary": ""
+  }
+]

@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+"""
+Camille's Hawaii ULU Systems EML Organizer v1.5
+Grok Semantic Layer + full recursive + source-folder preservation
+
+IMPORTANT:
+- Do not hardcode GROK_API_KEY in this file.
+- Set it as an environment variable in your terminal:
+  export GROK_API_KEY="..."
+"""
+
+import argparse
+import email
+import hashlib
+import json
+import logging
+import os
+import re
+import shutil
+import sys
+import urllib.request
+from datetime import datetime
+from email.header import decode_header
+from email.message import Message
+from email.policy import default as email_default_policy
+from email.utils import parsedate_to_datetime
+from pathlib import Path
+from typing import Optional, Tuple
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+logger = logging.getLogger("emlorganizer")
+
+SANITIZE_RE = re.compile(r'[^A-Za-z0-9._ -]')
+
+def sanitize(name: str, max_len: int = 80) -> str:
+    name = SANITIZE_RE.sub("_", name.strip())
+    name = re.sub(r"_+", "_", name)
+    return name[:max_len].strip("_") or "unnamed"
+
+def decode_header_value(header: str) -> str:
+    decoded = []
+    for part, encoding in decode_header(header):
+        if isinstance(part, bytes):
+            decoded.append(part.decode(encoding or "utf-8", errors="replace"))
+        else:
+            decoded.append(part)
+    return "".join(decoded)
+
+def extract_headers(msg: Message) -> Tuple[Optional[datetime], str, str]:
+    date_str = msg.get("Date")
+    dt: Optional[datetime] = None
+    if date_str:
+        try:
+            dt = parsedate_to_datetime(date_str)
+        except Exception:
+            pass
+    if not dt:
+        dt = None
+
+    from_hdr = msg.get("From", "")
+    from_decoded = decode_header_value(from_hdr)
+    match = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", from_decoded)
+    sender = match.group(0) if match else sanitize(from_decoded.split("<")[0] or "unknown")
+
+    subject = decode_header_value(msg.get("Subject", "no-subject"))
+    subject = sanitize(subject)
+
+    return dt, sender, subject
+
+def get_email_body(msg: Message) -> str:
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() == "text/plain":
+                return part.get_payload(decode=True).decode(errors="replace")
+    else:
+        return msg.get_payload(decode=True).decode(errors="replace")
+    return ""
+
+def grok_categorize(subject: str, sender: str, body: str, api_key: str) -> str:
+    """Call Grok API for semantic category."""
+    prompt = f"""You are an expert email categorizer for a Hawaii-based systems & consulting company (ULU Malu / ULU Hi-Tech).
+Classify this email into exactly ONE of these categories. Return ONLY the category name, nothing else.
+
+Categories:
+- CMMC-Compliance
+- Trading-Finance
+- Invoicing-Tax
+- Copilot-AI
+- Security-Alerts
+- HR-Admin
+- Vendor-MSP
+- ULU-Malu
+- ULU-HiTech
+- Personal
+- Uncategorized
+
+Subject: {subject}
+From: {sender}
+Body excerpt: {body[:800]}"""
+
+    data = {
+        "model": "grok-2-1212",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.0,
+        "max_tokens": 20
+    }
+
+    req = urllib.request.Request(
+        "https://api.x.ai/v1/chat/completions",
+        data=json.dumps(data).encode(),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read().decode())
+            category = result["choices"][0]["message"]["content"].strip()
+            return category if category in [
+                "CMMC-Compliance","Trading-Finance","Invoicing-Tax","Copilot-AI",
+                "Security-Alerts","HR-Admin","Vendor-MSP","ULU-Malu","ULU-HiTech",
+                "Personal","Uncategorized"
+            ] else "Uncategorized"
+    except Exception as e:
+        logger.warning(f"Grok API error: {e} → falling back to Uncategorized")
+        return "Uncategorized"
+
+# === GROK SENTIMENT (works with your current key) ===
+def grok_sentiment(subject: str, sender: str, body: str, api_key: str) -> dict:
+    prompt = f"""Return ONLY valid JSON:
+{{"sentiment": "positive|neutral|negative", "urgency": "high|medium|low", "action_needed": true|false, "one_line_summary": "max 12 words"}}
+
+Subject: {subject}
+From: {sender}
+Body: {body[:1000]}"""
+
+    data = {
+        "model": "grok-beta",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.0,
+        "max_tokens": 120
+    }
+
+    try:
+        req = urllib.request.Request(
+            "https://api.x.ai/v1/chat/completions",
+            data=json.dumps(data).encode(),
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read().decode())
+            return json.loads(result["choices"][0]["message"]["content"])
+    except Exception as e:
+        print(f"[GROK SENTIMENT FAILED] {e}")
+        return {"sentiment": "neutral", "urgency": "medium", "action_needed": False, "one_line_summary": "Grok failed"}
+
+def process_eml(eml_path: Path, output_base: Path, input_base: Path, dry_run: bool = True,
+                move: bool = False, by_subject: bool = False, semantic: bool = False,
+                grok_key: Optional[str] = None, quarantine: Path = None,
+                preserve_source: bool = True) -> dict:
+    try:
+        raw = eml_path.read_bytes()
+        msg = email.message_from_bytes(raw, policy=email_default_policy)
+
+        dt, sender, subject = extract_headers(msg)
+        content_hash = hashlib.sha256(raw).hexdigest()[:16]
+
+        if dt:
+            year = dt.strftime("%Y")
+            month = dt.strftime("%m")
+        else:
+            mtime = datetime.fromtimestamp(eml_path.stat().st_mtime)
+            year = mtime.strftime("%Y")
+            month = mtime.strftime("%m")
+
+        # Source folder preservation
+        try:
+            rel = eml_path.relative_to(input_base)
+            source_folder = str(rel.parent) if rel.parent != Path(".") else ""
+            if source_folder and preserve_source:
+                source_folder = sanitize(source_folder.split("/")[0])
+            else:
+                source_folder = ""
+        except Exception:
+            source_folder = ""
+
+        target = output_base
+        if source_folder:
+            target = target / source_folder
+        target = target / year / month / sender
+
+        if by_subject and subject:
+            target = target / subject[:60]
+
+        # === NEW v1.5: Grok Semantic Layer ===
+        category = "Uncategorized"
+        if semantic and grok_key and not dry_run:
+            body = get_email_body(msg)
+            category = grok_categorize(subject, sender, body, grok_key)
+            target = target / category
+            logger.info(f"  [GROK] Categorized as → {category}")
+
+        target.mkdir(parents=True, exist_ok=True)
+
+        safe_name = f"{year}{month}_{sanitize(subject, 100)}_{content_hash}.eml"
+        dest = target / safe_name
+
+        if dest.exists():
+            logger.warning(f"Duplicate skipped: {eml_path.name}")
+            return {"status": "duplicate", "src": str(eml_path)}
+
+        if dry_run:
+            logger.info(f"[DRY] Would {'move' if move else 'copy'} {eml_path.name} → {dest.relative_to(output_base)}")
+            return {"status": "dry_run", "src": str(eml_path), "dest": str(dest)}
+
+        if move:
+            shutil.move(str(eml_path), str(dest))
+        else:
+            shutil.copy2(str(eml_path), str(dest))
+
+        logger.info(f"✓ {'Moved' if move else 'Copied'} {eml_path.name} → {dest.relative_to(output_base)}")
+        return {"status": "success", "src": str(eml_path), "dest": str(dest)}
+    except Exception as e:
+        logger.error(f"Failed {eml_path.name}: {e}")
+        if quarantine:
+            quarantine.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(eml_path), str(quarantine / eml_path.name))
+        return {"status": "failed", "src": str(eml_path), "error": str(e)}
+
+def main():
+    parser = argparse.ArgumentParser(description="Camille's Hawaii ULU Systems EML Organizer v1.5 – Grok Semantic Layer", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("input", type=Path, help="Input dir")
+    parser.add_argument("output", type=Path, help="Base output directory")
+    parser.add_argument("--move", action="store_true", help="Move instead of copy")
+    parser.add_argument("--no-dry-run", action="store_true", help="Execute for real")
+    parser.add_argument("--by-subject", action="store_true", help="Add subject subfolder")
+    parser.add_argument("--semantic", action="store_true", help="Enable Grok semantic categorization")
+    parser.add_argument("--grok-key", type=str, default=os.getenv("GROK_API_KEY"), help="Grok API key (or set GROK_API_KEY env var)")
+    parser.add_argument("--preserve-source-folder", action="store_true", default=True)
+    parser.add_argument("--quarantine", type=Path, default=None)
+    args = parser.parse_args()
+
+    logging.getLogger().setLevel("INFO")
+
+    if not args.input.exists():
+        logger.error(f"Input not found: {args.input}")
+        sys.exit(1)
+
+    args.output.mkdir(parents=True, exist_ok=True)
+    quarantine = args.quarantine or args.output / "_quarantine"
+    quarantine.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"🚀 Camille's Hawaii ULU Systems EML Organizer v1.5 starting | semantic={args.semantic}")
+
+    stats = {"success": 0, "duplicate": 0, "failed": 0, "dry_run": 0}
+    eml_files = list(args.input.rglob("*.eml"))
+    processed_emails = []
+
+    for i, eml_path in enumerate(eml_files, 1):
+        result = process_eml(
+            eml_path, args.output, args.input,
+            dry_run=not args.no_dry_run,
+            move=args.move,
+            by_subject=args.by_subject,
+            semantic=args.semantic,
+            grok_key=args.grok_key,
+            quarantine=quarantine,
+            preserve_source=args.preserve_source_folder
+        )
+        stats[result["status"]] += 1
+        
+        # Add to processed emails manifest if successful
+        logger.info(f"Processing result: {result['status']}, no_dry_run: {args.no_dry_run}")
+        if result["status"] == "success" and args.no_dry_run:
+            try:
+                # Extract email details for the manifest
+                raw = Path(result["dest"]).read_bytes()
+                msg = email.message_from_bytes(raw, policy=email_default_policy)
+                dt, sender, subject = extract_headers(msg)
+                body = get_email_body(msg)
+                
+                # Get category from the path if semantic categorization was used
+                category = "Uncategorized"
+                if args.semantic:
+                    dest_path = Path(result["dest"])
+                    path_parts = dest_path.parts
+                    if len(path_parts) >= 5:  # year/month/sender/category/file.eml
+                        category = path_parts[-2]
+                
+                # Add sentiment analysis if Grok key is available
+                sentiment_data = {}
+                if args.semantic and args.grok_key:
+                    sentiment_data = grok_sentiment(subject, sender, body, args.grok_key)
+                
+                email_record = {
+                    "path": result["dest"],
+                    "sender": sender,
+                    "subject": subject,
+                    "category": category,
+                    "date": dt.isoformat() if dt else None,
+                    "sentiment": sentiment_data.get("sentiment", "neutral"),
+                    "urgency": sentiment_data.get("urgency", "medium"),
+                    "action_needed": sentiment_data.get("action_needed", False),
+                    "summary": sentiment_data.get("one_line_summary", "")
+                }
+                processed_emails.append(email_record)
+            except Exception as e:
+                logger.warning(f"Failed to add to manifest: {e}")
+
+    # Write processed emails manifest
+    if args.no_dry_run and processed_emails:
+        manifest_path = args.output / "processed_emails.json"
+        with open(manifest_path, 'w', encoding='utf-8') as f:
+            json.dump(processed_emails, f, indent=2, default=str)
+        logger.info(f"✓ Wrote manifest with {len(processed_emails)} emails to {manifest_path}")
+
+    logger.info("=== SUMMARY ===")
+    for k, v in stats.items():
+        logger.info(f"{k:12}: {v:6,}")
+    logger.info(f"Total .eml files: {len(eml_files):,}")
+
+    if args.semantic and not args.grok_key:
+        logger.warning("⚠️  --semantic used but no GROK_API_KEY provided. Set env var or --grok-key")
+
+if __name__ == "__main__":
+    main()

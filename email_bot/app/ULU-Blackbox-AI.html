@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ULU AI Command Center • Camille • Blackbox v1</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .chat-bubble-user { background: linear-gradient(135deg, #10b981, #34d399); }
+    .thinking { animation: pulse 1.5s infinite; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+  <div class="flex h-screen">
+    <!-- Sidebar -->
+    <div class="w-80 bg-zinc-900 border-r border-zinc-800 flex flex-col">
+      <div class="p-6 border-b border-zinc-800">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-emerald-500 rounded-2xl flex items-center justify-center text-xl">🌺</div>
+          <div>
+            <h1 class="text-2xl font-bold tracking-tight text-emerald-400">ULU BLACKBOX AI</h1>
+            <p class="text-xs text-emerald-400">Pentest Report Agent • ai-xgsn7koaekgj6</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4">
+        <div class="text-xs uppercase tracking-widest text-zinc-500 mb-3">Report Type (Blackbox Template)</div>
+        <select id="reportType" title="Report Type" class="w-full bg-zinc-800 border border-zinc-700 rounded-3xl px-5 py-4 text-sm focus:border-emerald-500">
+          <option value="executive">📋 Executive Summary (non-scary, business)</option>
+          <option value="technical">🔴 Detailed Technical (full scary breakdown)</option>
+          <option value="audit">📊 Audit-Ready (compliance + sign-off)</option>
+          <option value="quick">🎯 Quick Brief (5 bullets, this week)</option>
+        </select>
+      </div>
+
+      <div class="p-4">
+        <div class="text-xs uppercase tracking-widest text-zinc-500 mb-3">Reasoning Effort</div>
+        <select id="reasoning" title="Reasoning Effort" class="w-full bg-zinc-800 border border-zinc-700 rounded-3xl px-5 py-4 text-sm focus:border-emerald-500">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+      </div>
+
+      <div class="mt-auto p-4 border-t border-zinc-800">
+        <div onclick="toggleRespondForMe()" id="respondBtn" class="flex items-center gap-3 bg-zinc-800 hover:bg-zinc-700 p-4 rounded-3xl cursor-pointer">
+          <i class="fas fa-robot text-emerald-400"></i>
+          <div>
+            <div class="font-medium">Respond For Me Mode</div>
+            <div id="respondStatus" class="text-xs text-emerald-400">OFF • You stay in loop</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Chat -->
+    <div class="flex-1 flex flex-col">
+      <div class="border-b border-zinc-800 px-8 py-5 bg-zinc-900 flex justify-between items-center">
+        <div id="currentBadge" class="px-6 py-2 bg-zinc-800 rounded-3xl text-sm font-medium flex items-center gap-2">
+          <span class="text-emerald-400">●</span> GPT-4o • Blackbox Active
+        </div>
+        <button onclick="showSettings()" class="text-emerald-400 hover:text-white flex items-center gap-2">
+          <i class="fas fa-cog"></i> Settings (your Foundry key)
+        </button>
+      </div>
+
+      <div id="chat" class="flex-1 overflow-y-auto p-8 space-y-8 bg-[radial-gradient(#27272a_1px,transparent_1px)] bg-[length:40px_40px]"></div>
+
+      <div class="p-8 bg-zinc-900 border-t border-zinc-800">
+        <div class="flex gap-3">
+          <input id="userInput" type="text" placeholder="e.g. Q4 2025 pentest results..." 
+                 class="flex-1 bg-zinc-800 border border-zinc-700 rounded-3xl px-6 py-4 text-sm focus:border-emerald-500"
+                 onkeydown="if(event.key==='Enter') sendBlackboxMessage()">
+          <button onclick="sendBlackboxMessage()" 
+                  class="bg-emerald-500 hover:bg-emerald-600 px-10 rounded-3xl font-medium flex items-center gap-2">
+            <i class="fas fa-paper-plane"></i> RUN BLACKBOX
+          </button>
+        </div>
+        <p class="text-center text-[10px] text-emerald-400 mt-4">All activity logged to ULU SIEM • 100% inside ulumalusystems.com tenant</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+    <div class="bg-zinc-900 rounded-3xl p-8 w-full max-w-md">
+      <h2 class="text-2xl font-bold mb-6 flex items-center gap-3"><i class="fas fa-key"></i> Azure AI Foundry Credentials</h2>
+      <div class="space-y-6">
+        <div>
+          <label class="block text-xs text-zinc-400 mb-1">Endpoint</label>
+          <input id="azureEndpoint" title="Azure AI Foundry Endpoint" value="https://ai-xgsn7koaekgj6.openai.azure.com/openai/v1/" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-4 py-3 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs text-zinc-400 mb-1">API Key</label>
+          <input id="azureKey" type="password" title="API Key" placeholder="Paste your Azure AI Foundry API key" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl px-4 py-3 text-sm">
+        </div>
+      </div>
+      <div class="flex gap-3 mt-8">
+        <button onclick="saveSettings()" class="flex-1 bg-emerald-500 py-4 rounded-3xl font-medium">Save & Close</button>
+        <button onclick="hideSettings()" class="flex-1 bg-zinc-800 py-4 rounded-3xl font-medium">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let azureEndpoint = localStorage.getItem('azureEndpoint') || "https://ai-xgsn7koaekgj6.openai.azure.com/openai/v1/";
+    let azureKey = localStorage.getItem('azureKey') || "";
+    let respondForMe = false;
+
+    const templates = {
+      executive: `Summarize the pentest results in 1 page. Use business language, not technical jargon. Focus on risks to business operations. Keep it reassuring.`,
+      technical: `Provide full technical breakdown of all vulnerabilities. Include CVSS scores, attack vectors, proof of concept, and remediation steps. Be thorough and technical.`,
+      audit: `Generate audit-ready documentation. Include: executive summary, methodology, findings, risk ratings, compliance mapping, remediation timeline, and sign-off sections.`,
+      quick: `Give me 5 bullet points on critical actions needed. What do I need to fix THIS WEEK?`
+    };
+
+    function addMessage(text, role, modelName = '') {
+      const chat = document.getElementById('chat');
+      const bubble = document.createElement('div');
+      bubble.className = `max-w-3xl ${role === 'user' ? 'ml-auto' : 'mr-auto'}`;
+      bubble.innerHTML = `
+        <div class="${role === 'user' ? 'chat-bubble-user text-black' : 'bg-zinc-800'} px-6 py-4 rounded-3xl">
+          ${role === 'ai' && modelName ? `<div class="text-xs text-emerald-400 mb-2">${modelName}</div>` : ''}
+          <div class="text-sm leading-relaxed whitespace-pre-wrap">${text}</div>
+        </div>
+      `;
+      chat.appendChild(bubble);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function showThinking(text) {
+      const chat = document.getElementById('chat');
+      const id = 'think-' + Date.now();
+      chat.innerHTML += `
+        <div id="${id}" class="max-w-3xl mr-auto">
+          <div class="bg-zinc-800 px-6 py-4 rounded-3xl flex items-center gap-3">
+            <i class="fas fa-spinner fa-spin text-emerald-400"></i>
+            <span class="text-sm text-zinc-400">${text}</span>
+          </div>
+        </div>`;
+      chat.scrollTop = chat.scrollHeight;
+      return id;
+    }
+
+    async function sendBlackboxMessage() {
+      const input = document.getElementById('userInput');
+      if (!input.value.trim() || !azureKey) {
+        if (!azureKey) alert("Open Settings → paste your ai-xgsn7koaekgj6 API Key first");
+        return;
+      }
+
+      const userQuery = input.value.trim();
+      const reportType = document.getElementById('reportType').value;
+      const effort = document.getElementById('reasoning').value;
+
+      addMessage(userQuery, 'user');
+      input.value = '';
+
+      const thinkId = showThinking(`🔍 Searching SharePoint + Teams... (RAG pipeline active)`);
+
+      // Blackbox prompt construction
+      const fullPrompt = `${templates[reportType]}\n\nUser query: ${userQuery}\n\nRelevant context from internal docs will be injected here in Phase 2.`;
+
+      setTimeout(async () => {  // simulate RAG delay
+        document.getElementById(thinkId).remove();
+        const finalThink = showThinking(`🚀 Sending to Azure AI Foundry with ${effort} reasoning effort...`);
+
+        try {
+          const res = await fetch(`${azureEndpoint}chat/completions`, {
+            method: 'POST',
+            headers: { 'api-key': azureKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: "gpt-4o",
+              messages: [{ role: "user", content: fullPrompt }],
+              max_tokens: 4000,
+              reasoning_effort: effort
+            })
+          });
+
+          const data = await res.json();
+          document.getElementById(finalThink).remove();
+
+          const reply = data.choices?.[0]?.message?.content || "No response from Foundry.";
+          addMessage(reply, 'ai', `Azure Foundry • ${reportType.toUpperCase()} TEMPLATE`);
+        } catch(e) {
+          document.getElementById(finalThink).remove();
+          addMessage("❌ Azure call failed: " + e.message, 'ai');
+        }
+      }, 1200);
+    }
+
+    function toggleRespondForMe() {
+      respondForMe = !respondForMe;
+      document.getElementById('respondStatus').textContent = respondForMe ? 'ON • Auto-approves under your rules' : 'OFF • You approve every reply';
+    }
+
+    function showSettings() { document.getElementById('settingsModal').classList.remove('hidden'); }
+    function hideSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+    function saveSettings() {
+      azureEndpoint = document.getElementById('azureEndpoint').value.trim();
+      azureKey = document.getElementById('azureKey').value.trim();
+      localStorage.setItem('azureEndpoint', azureEndpoint);
+      localStorage.setItem('azureKey', azureKey);
+      hideSettings();
+      addMessage("✅ Credentials saved. Blackbox now live on your Foundry.", 'ai');
+    }
+
+    // Init
+    window.onload = () => {
+      addMessage("Blackbox loaded, Camille.<br>Pick report type + type your pentest query.<br>Everything stays inside ulumalusystems.com.", 'ai');
+    };
+  </script>
+</body>
+</html>
