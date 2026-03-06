@@ -88,6 +88,15 @@ export default function App(){
             {[{name:"rg-uluguardian",type:"Resource Group",ok:true},{name:"ulu-malu-kv",type:"Key Vault",ok:true},{name:"ai-xgsn7k…",type:"Foundry Project",ok:true},{name:"MS Foundry",type:"Sign-in required",ok:false}].map((r,i)=><div key={i} style={{marginBottom:8,padding:"6px 8px",background:CARD,borderRadius:6,border:`1px solid ${r.ok?BORDER:WARN+"44"}`}}><div style={{fontSize:9,color:r.ok?"#5A9ABA":WARN,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</div><div style={{fontSize:8,color:r.ok?"#2A4A60":WARN+"88"}}>{r.type}</div></div>)}
           </div>
           <div style={{borderTop:`1px solid ${BORDER}`,marginTop:8,paddingTop:12}}>
+            <div style={{fontSize:9,color:"#2A5A7A",letterSpacing:2,marginBottom:10}}>AZURE ACCOUNT</div>
+            <div style={{marginBottom:8,padding:"8px 10px",background:CARD,borderRadius:6,border:`1px solid ${BORDER}`}}>
+              <div style={{fontSize:8,color:"#2A4A60",marginBottom:4,letterSpacing:1}}>NAME</div>
+              <div style={{fontSize:9,color:"#5A9ABA",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>ulu-malu-systems</div>
+              <div style={{fontSize:8,color:"#2A4A60",marginTop:6,marginBottom:4,letterSpacing:1}}>ID</div>
+              <div style={{fontSize:9,color:"#5A9ABA",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",fontFamily:"monospace"}}>c9f2a…4b71e</div>
+            </div>
+          </div>
+          <div style={{borderTop:`1px solid ${BORDER}`,marginTop:8,paddingTop:12}}>
             <div style={{fontSize:9,color:"#2A5A7A",letterSpacing:2,marginBottom:10}}>ULU STACK</div>
             {["Copilot Studio","Microsoft Foundry","Azure Functions","Logic Apps","Key Vault","Fabric Lakehouse","SharePoint","Power BI"].map(s=><div key={s} style={{fontSize:9,color:"#1A4A6A",padding:"3px 0",display:"flex",alignItems:"center",gap:5}}><span style={{width:4,height:4,borderRadius:"50%",background:"#0A4A3A",display:"inline-block",flexShrink:0}}/>{s}</div>)}
           </div>
