@@ -51,7 +51,7 @@ const MOCK_ALERTS = [
 
 const SERVICE_AREAS = ['Cloud Infrastructure', 'Application Dev', 'AI Services', 'Cybersecurity', 'Compliance']
 
-export default function Dashboard() {
+export default function Dashboard({ onPageData }) {
   const [clients, setClients] = useState(MOCK_CLIENTS)
   const [alerts,  setAlerts]  = useState(MOCK_ALERTS)
   const [loading, setLoading] = useState(true)
@@ -62,6 +62,15 @@ export default function Dashboard() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  // Report data to Kia'i context whenever it changes
+  useEffect(() => {
+    onPageData?.({
+      clients: clients.map(c => ({ name: c.name, status: c.status, alerts: c.alerts, complianceScore: c.complianceScore })),
+      alerts:  alerts.map(a => ({ id: a.AlertId, client: a.ClientName, severity: a.Severity, title: a.Title, status: a.Status })),
+      summary: { totalAlerts: alerts.length, activeClients: clients.length }
+    })
+  }, [clients, alerts, onPageData])
 
   const totalAlerts   = alerts.length
   const criticalCount = alerts.filter(a => a.Severity === 'high' || a.Severity === 'critical').length

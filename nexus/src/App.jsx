@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import Sidebar from './components/Sidebar'
 import Header from './components/Header'
+import KiaiChat from './components/KiaiChat'
 import Dashboard from './pages/Dashboard'
 import ReviewDrafts from './pages/ReviewDrafts'
 import BriefingGenerator from './pages/BriefingGenerator'
@@ -16,13 +17,19 @@ const PAGES = {
 }
 
 export default function App() {
-  const [nav, setNav]             = useState('dashboard')
+  const [nav, setNav]           = useState('dashboard')
   const [clientHint, setClientHint] = useState(null)
+  const [pageData, setPageData] = useState({})  // live page data for Kia'i context
 
   const handleClientHint = (page, client) => {
     setClientHint({ page, client })
     setNav(page)
   }
+
+  // Pages call this when their data loads so Kia'i has context
+  const handlePageData = useCallback((data) => {
+    setPageData(data)
+  }, [])
 
   const Page = PAGES[nav] || Dashboard
 
@@ -34,8 +41,13 @@ export default function App() {
       <Header alertCount={3} onNav={setNav} onClientHint={handleClientHint} />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <Sidebar active={nav} onNav={setNav} />
-        <Page clientHint={clientHint} />
+        <Page clientHint={clientHint} onPageData={handlePageData} />
       </div>
+      <KiaiChat
+        currentPage={nav}
+        pageData={pageData}
+        onNav={setNav}
+      />
     </div>
   )
 }
