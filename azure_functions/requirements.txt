@@ -1,0 +1,6 @@
+azure-functions
+azure-identity
+msgraph-sdk
+office365-REST-python-client
+openai
+python-dotenv

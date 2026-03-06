@@ -3,6 +3,8 @@
         "teamsdevapp.vscode-ai-foundry",
         "ms-python.vscode-pylance",
         "github.copilot-chat",
-        "github.codespaces"
+        "github.codespaces",
+        "sarthikbhat.json-server",
+        "ms-azuretools.azure-dev"
     ]
 }
