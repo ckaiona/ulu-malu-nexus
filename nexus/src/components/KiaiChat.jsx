@@ -56,10 +56,11 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
   const [dragOver, setDragOver] = useState(false)
   const [listening, setListening] = useState(false)
 
-  const bottomRef     = useRef(null)
-  const inputRef      = useRef(null)
-  const fileInputRef  = useRef(null)
+  const bottomRef      = useRef(null)
+  const inputRef       = useRef(null)
+  const fileInputRef   = useRef(null)
   const recognitionRef = useRef(null)
+  const wantListening  = useRef(false)
 
   // Scroll to bottom on new message
   useEffect(() => {
@@ -84,28 +85,42 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
       return
     }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    const rec = new SR()
-    rec.lang = 'en-US'
-    rec.interimResults = true
-    rec.continuous = true
-    recognitionRef.current = rec
-    setListening(true)
 
-    rec.onresult = (e) => {
-      const text = Array.from(e.results).map(r => r[0].transcript).join('')
-      setInput(text)
-    }
-    rec.onerror = (e) => {
-      if (e.error === 'not-allowed') {
-        setMessages(m => [...m, { role: 'assistant', content: 'Mic access was blocked. Allow microphone in your browser settings and try again.' }])
+    const startRec = () => {
+      const rec = new SR()
+      rec.lang = 'en-US'
+      rec.interimResults = true
+      rec.continuous = true
+      recognitionRef.current = rec
+
+      rec.onresult = (e) => {
+        const text = Array.from(e.results).map(r => r[0].transcript).join('')
+        setInput(text)
       }
-      if (e.error !== 'no-speech') setListening(false)
+      rec.onerror = (e) => {
+        if (e.error === 'not-allowed') {
+          setMessages(m => [...m, { role: 'assistant', content: 'Mic access was blocked. Allow microphone in your browser settings and try again.' }])
+          wantListening.current = false
+          setListening(false)
+        }
+      }
+      rec.onend = () => {
+        if (wantListening.current) {
+          setTimeout(startRec, 200)
+        } else {
+          setListening(false)
+        }
+      }
+      rec.start()
     }
-    rec.onend = () => setListening(false)
-    rec.start()
+
+    wantListening.current = true
+    setListening(true)
+    startRec()
   }, [supported, listening])
 
   const stopVoice = useCallback(() => {
+    wantListening.current = false
     recognitionRef.current?.stop()
     setListening(false)
   }, [])
