@@ -29,4 +29,7 @@ export const api = {
 
   // AuditLog
   getAuditLog: (limit = 100) => fetch(`${BASE}/audit-log?limit=${limit}`, { headers: headers() }).then(r => r.json()),
+
+  // AI Pentest Agent
+  analyzePentest: (body) => fetch(`${BASE}/pentest-analyze`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }).then(r => r.json()),
 }

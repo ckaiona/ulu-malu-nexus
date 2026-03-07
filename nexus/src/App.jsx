@@ -107,7 +107,7 @@ export default function App() {
       <Header alertCount={3} onNav={setNav} onClientHint={handleClientHint} />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <Sidebar active={nav} onNav={setNav} />
-        <Page clientHint={clientHint} onPageData={handlePageData} />
+        <Page clientHint={clientHint} onPageData={handlePageData} onClientHint={handleClientHint} />
         <RightPanel onNav={setNav} />
       </div>
       <KiaiChat currentPage={nav} pageData={pageData} onNav={setNav} />

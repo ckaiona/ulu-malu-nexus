@@ -7,7 +7,7 @@ const COMMANDS = [
   { patterns: ['show alerts', 'open alerts', 'dashboard', 'home'],           nav: 'dashboard' },
   { patterns: ['review drafts', 'show drafts', 'drafts', 'open drafts'],     nav: 'drafts' },
   { patterns: ['audit log', 'show audit', 'audit'],                          nav: 'auditlog' },
-  { patterns: ['pentest', 'pentest queue', 'scans', 'show scans'],           nav: 'pentest' },
+  { patterns: ['pentest', 'pentest queue', 'scans', 'show scans', 'analyze pentest', 'run analysis'], nav: 'pentest' },
   { patterns: ['briefing', 'create briefing', 'generate report', 'reports'], nav: 'briefing' },
   { patterns: ['analytics', 'show analytics', 'trends', 'show trends', 'kpis'], nav: 'analytics' },
   { patterns: ['briefing for'],   nav: 'briefing',  extract: 'client' },
