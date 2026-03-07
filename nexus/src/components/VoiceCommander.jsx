@@ -32,65 +32,75 @@ function matchCommand(transcript) {
 }
 
 export default function VoiceCommander({ onNav, onClientHint }) {
-  const [status, setStatus]       = useState('idle')   // idle | listening | processing | error
+  const [status, setStatus]         = useState('idle')
   const [transcript, setTranscript] = useState('')
-  const [lastCmd, setLastCmd]     = useState('')
-  const recognitionRef            = useRef(null)
-  const timeoutRef                = useRef(null)
+  const [lastCmd, setLastCmd]       = useState('')
+  const recognitionRef              = useRef(null)
+  const wantListening               = useRef(false)
 
-  const supported = typeof window !== 'undefined' && 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
+  const supported = typeof window !== 'undefined' &&
+    ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)
 
   const stopListening = useCallback(() => {
+    wantListening.current = false
     recognitionRef.current?.stop()
-    clearTimeout(timeoutRef.current)
     setStatus('idle')
   }, [])
 
   const startListening = useCallback(() => {
-    if (!supported || status === 'listening') { stopListening(); return }
+    if (!supported) return
+    if (wantListening.current) { stopListening(); return }
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    const rec = new SR()
-    rec.lang = 'en-US'
-    rec.interimResults = true
-    rec.maxAlternatives = 1
-    rec.continuous = false
-    recognitionRef.current = rec
 
+    const startRec = () => {
+      const rec = new SR()
+      rec.lang = 'en-US'
+      rec.interimResults = true
+      rec.maxAlternatives = 1
+      rec.continuous = false
+      recognitionRef.current = rec
+
+      rec.onresult = (e) => {
+        const interim = Array.from(e.results).map(r => r[0].transcript).join('')
+        setTranscript(interim)
+        if (e.results[e.results.length - 1].isFinal) {
+          setStatus('processing')
+          const match = matchCommand(interim)
+          if (match) {
+            setLastCmd(`"${interim}" → ${match.nav}`)
+            onNav(match.nav)
+            if (match.client && onClientHint) onClientHint(match.nav, match.client)
+          } else {
+            setLastCmd(`"${interim}" — not recognized`)
+          }
+          setTimeout(() => { if (wantListening.current) setStatus('listening') }, 1000)
+        }
+      }
+
+      rec.onerror = (e) => {
+        if (e.error !== 'no-speech') setStatus('error')
+        setTimeout(() => { if (wantListening.current) setStatus('listening') }, 1500)
+      }
+
+      rec.onend = () => {
+        if (wantListening.current) {
+          setTimeout(startRec, 150)
+        } else {
+          setStatus('idle')
+        }
+      }
+
+      rec.start()
+    }
+
+    wantListening.current = true
     setStatus('listening')
     setTranscript('')
+    startRec()
+  }, [supported, onNav, onClientHint, stopListening])
 
-    rec.onresult = (e) => {
-      const interim = Array.from(e.results).map(r => r[0].transcript).join('')
-      setTranscript(interim)
-      if (e.results[e.results.length - 1].isFinal) {
-        setStatus('processing')
-        const match = matchCommand(interim)
-        if (match) {
-          setLastCmd(`"${interim}" → ${match.nav}`)
-          onNav(match.nav)
-          if (match.client && onClientHint) onClientHint(match.nav, match.client)
-        } else {
-          setLastCmd(`"${interim}" — not recognized`)
-        }
-        setTimeout(() => setStatus('idle'), 1500)
-      }
-    }
-
-    rec.onerror = (e) => {
-      setStatus(e.error === 'no-speech' ? 'idle' : 'error')
-      setTimeout(() => setStatus('idle'), 2000)
-    }
-
-    rec.onend = () => { if (status === 'listening') setStatus('idle') }
-
-    rec.start()
-
-    // Auto-stop after 8 seconds
-    timeoutRef.current = setTimeout(stopListening, 8000)
-  }, [status, supported, onNav, onClientHint, stopListening])
-
-  useEffect(() => () => { recognitionRef.current?.stop(); clearTimeout(timeoutRef.current) }, [])
+  useEffect(() => () => { wantListening.current = false; recognitionRef.current?.stop() }, [])
 
   if (!supported) return null
 
