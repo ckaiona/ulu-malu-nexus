@@ -72,58 +72,80 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
     if (open) setTimeout(() => inputRef.current?.focus(), 100)
   }, [open])
 
-  // ── Voice dictation ──────────────────────────────────────────────────────
-  const supported = typeof window !== 'undefined' &&
-    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+  // ── Voice dictation (Azure Speech SDK via CDN) ───────────────────────────
+  function loadSpeechSDK() {
+    if (window.SpeechSDK) return Promise.resolve(window.SpeechSDK)
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script')
+      s.src = 'https://aka.ms/csspeech/jsbrowserpackageraw'
+      s.onload  = () => resolve(window.SpeechSDK)
+      s.onerror = () => reject(new Error('Failed to load Speech SDK'))
+      document.head.appendChild(s)
+    })
+  }
 
   const startVoice = useCallback(async () => {
-    if (!supported || listening) return
+    if (listening) return
+
+    wantListening.current = true
+    setListening(true)
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      stream.getTracks().forEach(t => t.stop())
-    } catch {
-      setMessages(m => [...m, { role: 'assistant', content: 'Mic access was blocked. Allow microphone in your browser settings and try again.' }])
-      return
-    }
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+      const [SDK, res] = await Promise.all([
+        loadSpeechSDK(),
+        fetch('/api/speech-token').then(r => r.json())
+      ])
 
-    const startRec = () => {
-      const rec = new SR()
-      rec.lang = 'en-US'
-      rec.interimResults = true
-      rec.continuous = true
-      recognitionRef.current = rec
+      if (!wantListening.current) return
 
-      rec.onresult = (e) => {
-        const text = Array.from(e.results).map(r => r[0].transcript).join('')
-        setInput(text)
+      const { token, region } = res
+      const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region)
+      speechConfig.speechRecognitionLanguage = 'en-US'
+      const audioConfig  = SDK.AudioConfig.fromDefaultMicrophoneInput()
+      const recognizer   = new SDK.SpeechRecognizer(speechConfig, audioConfig)
+      recognitionRef.current = recognizer
+
+      recognizer.recognizing = (_, e) => {
+        if (e.result.text) setInput(e.result.text)
       }
-      rec.onerror = (e) => {
-        if (e.error === 'not-allowed') {
-          setMessages(m => [...m, { role: 'assistant', content: 'Mic access was blocked. Allow microphone in your browser settings and try again.' }])
+
+      recognizer.recognized = (_, e) => {
+        if (e.result.text) setInput(e.result.text)
+      }
+
+      recognizer.canceled = (_, e) => {
+        if (e.errorCode !== 0) {
+          setMessages(m => [...m, { role: 'assistant', content: `Mic error: ${e.errorDetails || 'Speech error'}` }])
           wantListening.current = false
           setListening(false)
         }
       }
-      rec.onend = () => {
-        if (wantListening.current) {
-          setTimeout(startRec, 200)
-        } else {
+
+      recognizer.startContinuousRecognitionAsync(
+        () => {},
+        (err) => {
+          setMessages(m => [...m, { role: 'assistant', content: `Mic error: ${err}` }])
+          wantListening.current = false
           setListening(false)
         }
-      }
-      rec.start()
+      )
+    } catch (err) {
+      setMessages(m => [...m, { role: 'assistant', content: `Voice error: ${err.message}` }])
+      wantListening.current = false
+      setListening(false)
     }
-
-    wantListening.current = true
-    setListening(true)
-    startRec()
-  }, [supported, listening])
+  }, [listening])
 
   const stopVoice = useCallback(() => {
     wantListening.current = false
-    recognitionRef.current?.stop()
-    setListening(false)
+    if (recognitionRef.current) {
+      recognitionRef.current.stopContinuousRecognitionAsync(
+        () => { recognitionRef.current?.close(); recognitionRef.current = null; setListening(false) },
+        () => { recognitionRef.current?.close(); recognitionRef.current = null; setListening(false) }
+      )
+    } else {
+      setListening(false)
+    }
   }, [])
 
   // ── Image handling ───────────────────────────────────────────────────────
@@ -420,9 +442,8 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
                 onChange={e => { if (e.target.files[0]) attachImage(e.target.files[0]); e.target.value = '' }}
               />
 
-              {/* Mic button — dictates into input */}
-              {supported && (
-                <button
+              {/* Mic button — dictates into input (Azure Speech SDK) */}
+              <button
                   onClick={listening ? stopVoice : startVoice}
                   title={listening ? 'Stop dictation' : 'Dictate message'}
                   style={{
@@ -437,7 +458,6 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
                 >
                   {listening ? '⏹' : '🎙'}
                 </button>
-              )}
 
               {/* Send */}
               <button

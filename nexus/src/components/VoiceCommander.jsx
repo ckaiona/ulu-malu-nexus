@@ -9,7 +9,6 @@ const COMMANDS = [
   { patterns: ['audit log', 'show audit', 'audit'],                          nav: 'auditlog' },
   { patterns: ['pentest', 'pentest queue', 'scans', 'show scans'],           nav: 'pentest' },
   { patterns: ['briefing', 'create briefing', 'generate report', 'reports'], nav: 'briefing' },
-  // Parametric — "create briefing for HEMIC" / "queue pentest for KoreTech"
   { patterns: ['briefing for'],   nav: 'briefing',  extract: 'client' },
   { patterns: ['pentest for'],    nav: 'pentest',   extract: 'client' },
 ]
@@ -31,93 +30,120 @@ function matchCommand(transcript) {
   return null
 }
 
-export default function VoiceCommander({ onNav, onClientHint }) {
-  const [status, setStatus]         = useState('idle')
-  const [transcript, setTranscript] = useState('')
-  const [lastCmd, setLastCmd]       = useState('')
-  const recognitionRef              = useRef(null)
-  const wantListening               = useRef(false)
+// Load Azure Speech SDK from CDN (cached on window)
+function loadSpeechSDK() {
+  if (window.SpeechSDK) return Promise.resolve(window.SpeechSDK)
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script')
+    s.src = 'https://aka.ms/csspeech/jsbrowserpackageraw'
+    s.onload  = () => resolve(window.SpeechSDK)
+    s.onerror = () => reject(new Error('Failed to load Speech SDK'))
+    document.head.appendChild(s)
+  })
+}
 
-  const supported = typeof window !== 'undefined' &&
-    ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)
+async function fetchSpeechToken() {
+  const res = await fetch('/api/speech-token')
+  if (!res.ok) throw new Error(`Token fetch failed: ${res.status}`)
+  return res.json() // { token, region }
+}
+
+export default function VoiceCommander({ onNav, onClientHint }) {
+  const [status, setStatus]       = useState('idle')
+  const [transcript, setTranscript] = useState('')
+  const [lastCmd, setLastCmd]     = useState('')
+  const recognizerRef             = useRef(null)
+  const wantListening             = useRef(false)
 
   const stopListening = useCallback(() => {
     wantListening.current = false
-    recognitionRef.current?.stop()
+    if (recognizerRef.current) {
+      recognizerRef.current.stopContinuousRecognitionAsync(
+        () => { recognizerRef.current?.close(); recognizerRef.current = null },
+        () => { recognizerRef.current?.close(); recognizerRef.current = null }
+      )
+    }
     setStatus('idle')
   }, [])
 
   const startListening = useCallback(async () => {
-    if (!supported) return
     if (wantListening.current) { stopListening(); return }
 
+    setStatus('listening')
+    wantListening.current = true
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      stream.getTracks().forEach(t => t.stop())
-    } catch {
-      setStatus('error')
-      setTimeout(() => setStatus('idle'), 2000)
-      return
-    }
+      const [SDK, { token, region }] = await Promise.all([loadSpeechSDK(), fetchSpeechToken()])
 
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+      if (!wantListening.current) return // user cancelled while loading
 
-    const startRec = () => {
-      const rec = new SR()
-      rec.lang = 'en-US'
-      rec.interimResults = true
-      rec.maxAlternatives = 1
-      rec.continuous = true
-      recognitionRef.current = rec
+      const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region)
+      speechConfig.speechRecognitionLanguage = 'en-US'
+      const audioConfig  = SDK.AudioConfig.fromDefaultMicrophoneInput()
+      const recognizer   = new SDK.SpeechRecognizer(speechConfig, audioConfig)
+      recognizerRef.current = recognizer
 
-      rec.onresult = (e) => {
-        const last = e.results[e.results.length - 1]
-        const interim = last[0].transcript
-        setTranscript(interim)
-        if (last.isFinal) {
-          setStatus('processing')
-          const match = matchCommand(interim)
-          if (match) {
-            setLastCmd(`"${interim}" → ${match.nav}`)
-            onNav(match.nav)
-            if (match.client && onClientHint) onClientHint(match.nav, match.client)
-          } else {
-            setLastCmd(`"${interim}" — not recognized`)
-          }
-          setTranscript('')
-          setTimeout(() => { if (wantListening.current) setStatus('listening') }, 800)
+      recognizer.recognizing = (_, e) => {
+        setTranscript(e.result.text)
+      }
+
+      recognizer.recognized = (_, e) => {
+        const text = e.result.text
+        if (!text) return
+        setTranscript(text)
+        setStatus('processing')
+        const match = matchCommand(text)
+        if (match) {
+          setLastCmd(`"${text}" → ${match.nav}`)
+          onNav(match.nav)
+          if (match.client && onClientHint) onClientHint(match.nav, match.client)
+        } else {
+          setLastCmd(`"${text}" — not recognized`)
+        }
+        setTranscript('')
+        setTimeout(() => { if (wantListening.current) setStatus('listening') }, 800)
+      }
+
+      recognizer.canceled = (_, e) => {
+        if (e.errorCode !== 0) {
+          setLastCmd(`Error: ${e.errorDetails || 'Speech error'}`)
+          setStatus('error')
+          setTimeout(() => setStatus('idle'), 3000)
+          wantListening.current = false
         }
       }
 
-      rec.onerror = (e) => {
-        if (e.error !== 'no-speech') setStatus('error')
-        setTimeout(() => { if (wantListening.current) setStatus('listening') }, 1500)
+      recognizer.sessionStopped = () => {
+        if (!wantListening.current) setStatus('idle')
       }
 
-      rec.onend = () => {
-        if (wantListening.current) setTimeout(startRec, 200)
-        else setStatus('idle')
-      }
-
-      rec.start()
+      recognizer.startContinuousRecognitionAsync(
+        () => {},
+        (err) => {
+          setLastCmd(`Mic error: ${err}`)
+          setStatus('error')
+          setTimeout(() => setStatus('idle'), 3000)
+          wantListening.current = false
+        }
+      )
+    } catch (err) {
+      setLastCmd(`${err.message}`)
+      setStatus('error')
+      setTimeout(() => setStatus('idle'), 3000)
+      wantListening.current = false
     }
+  }, [onNav, onClientHint, stopListening])
 
-    wantListening.current = true
-    setStatus('listening')
-    setTranscript('')
-    startRec()
-  }, [supported, onNav, onClientHint, stopListening])
-
-  useEffect(() => () => { wantListening.current = false; recognitionRef.current?.stop() }, [])
-
-  if (!supported) return null
+  useEffect(() => () => {
+    wantListening.current = false
+    recognizerRef.current?.close()
+  }, [])
 
   const stateColor = { idle: '#2A5A7A', listening: A, processing: '#FFD166', error: WARN }[status]
   const stateLabel = { idle: '', listening: 'LISTENING', processing: 'PROCESSING', error: 'ERROR' }[status]
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      {/* Status label */}
       {status !== 'idle' && (
         <div style={{ fontSize: 9, color: stateColor, letterSpacing: 2, animation: status === 'listening' ? 'pulse 1s infinite' : 'none' }}>
           {stateLabel}
@@ -135,7 +161,6 @@ export default function VoiceCommander({ onNav, onClientHint }) {
         </div>
       )}
 
-      {/* Mic button */}
       <button
         onClick={status === 'listening' ? stopListening : startListening}
         title={status === 'listening' ? 'Stop listening' : 'Voice command'}
