@@ -58,13 +58,14 @@ export default function VoiceCommander({ onNav, onClientHint }) {
       rec.lang = 'en-US'
       rec.interimResults = true
       rec.maxAlternatives = 1
-      rec.continuous = false
+      rec.continuous = true
       recognitionRef.current = rec
 
       rec.onresult = (e) => {
-        const interim = Array.from(e.results).map(r => r[0].transcript).join('')
+        const last = e.results[e.results.length - 1]
+        const interim = last[0].transcript
         setTranscript(interim)
-        if (e.results[e.results.length - 1].isFinal) {
+        if (last.isFinal) {
           setStatus('processing')
           const match = matchCommand(interim)
           if (match) {
@@ -74,7 +75,8 @@ export default function VoiceCommander({ onNav, onClientHint }) {
           } else {
             setLastCmd(`"${interim}" — not recognized`)
           }
-          setTimeout(() => { if (wantListening.current) setStatus('listening') }, 1000)
+          setTranscript('')
+          setTimeout(() => { if (wantListening.current) setStatus('listening') }, 800)
         }
       }
 
@@ -84,11 +86,8 @@ export default function VoiceCommander({ onNav, onClientHint }) {
       }
 
       rec.onend = () => {
-        if (wantListening.current) {
-          setTimeout(startRec, 150)
-        } else {
-          setStatus('idle')
-        }
+        if (wantListening.current) setTimeout(startRec, 200)
+        else setStatus('idle')
       }
 
       rec.start()
