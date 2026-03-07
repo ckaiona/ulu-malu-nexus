@@ -6,6 +6,7 @@ const NAV = [
   { id: 'briefing',   icon: '◆', label: 'Briefings',   sub: 'AI Reports' },
   { id: 'pentest',    icon: '◉', label: 'Pentest',     sub: 'Scan Queue' },
   { id: 'auditlog',   icon: '◇', label: 'Audit Log',   sub: 'All Actions' },
+  { id: 'analytics',  icon: '◎', label: 'Analytics',   sub: 'Trends & KPIs' },
 ]
 
 export default function Sidebar({ active, onNav }) {

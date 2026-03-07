@@ -7,6 +7,7 @@ import ReviewDrafts from './pages/ReviewDrafts'
 import BriefingGenerator from './pages/BriefingGenerator'
 import PentestQueue from './pages/PentestQueue'
 import AuditLog from './pages/AuditLog'
+import Analytics from './pages/Analytics'
 
 const A = '#00E6C3', WARN = '#FF6B35', GREEN = '#00FF88', BORDER = '#1A3A5C', CARD = '#0D1F35'
 
@@ -34,6 +35,7 @@ const PAGES = {
   briefing:  BriefingGenerator,
   pentest:   PentestQueue,
   auditlog:  AuditLog,
+  analytics: Analytics,
 }
 
 function RightPanel({ onNav }) {

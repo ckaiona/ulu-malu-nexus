@@ -9,6 +9,7 @@ const COMMANDS = [
   { patterns: ['audit log', 'show audit', 'audit'],                          nav: 'auditlog' },
   { patterns: ['pentest', 'pentest queue', 'scans', 'show scans'],           nav: 'pentest' },
   { patterns: ['briefing', 'create briefing', 'generate report', 'reports'], nav: 'briefing' },
+  { patterns: ['analytics', 'show analytics', 'trends', 'show trends', 'kpis'], nav: 'analytics' },
   { patterns: ['briefing for'],   nav: 'briefing',  extract: 'client' },
   { patterns: ['pentest for'],    nav: 'pentest',   extract: 'client' },
 ]

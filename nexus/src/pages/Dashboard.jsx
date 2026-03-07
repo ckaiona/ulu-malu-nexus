@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import StatCard from '../components/StatCard'
 import { api } from '../api'
+import { logEvent } from './Analytics'
 
 const A = '#00E6C3', WARN = '#FF6B35', GREEN = '#00FF88', BORDER = '#1A3A5C', CARD = '#0D1F35'
 
@@ -63,13 +64,26 @@ export default function Dashboard({ onPageData }) {
       .finally(() => setLoading(false))
   }, [])
 
-  // Report data to Kia'i context whenever it changes
+  // Report data to Kia'i + stream telemetry to Log Analytics
   useEffect(() => {
     onPageData?.({
       clients: clients.map(c => ({ name: c.name, status: c.status, alerts: c.alerts, complianceScore: c.complianceScore })),
       alerts:  alerts.map(a => ({ id: a.AlertId, client: a.ClientName, severity: a.Severity, title: a.Title, status: a.Status })),
       summary: { totalAlerts: alerts.length, activeClients: clients.length }
     })
+    // Log client health snapshot to Log Analytics (feeds Power BI)
+    if (clients.length) {
+      logEvent('NexusClientHealth_CL', clients.map(c => ({
+        ClientName: c.name, RiskScore: c.riskScore, CloudHealth: c.cloudHealth,
+        ComplianceScore: c.complianceScore, AppUptime: c.appUptime, AlertCount: c.alerts,
+      })))
+    }
+    if (alerts.length) {
+      logEvent('NexusAlert_CL', alerts.map(a => ({
+        AlertId: a.AlertId, ClientName: a.ClientName, Severity: a.Severity,
+        Title: a.Title, Status: a.Status, ServiceArea: a.ServiceArea,
+      })))
+    }
   }, [clients, alerts, onPageData])
 
   const totalAlerts   = alerts.length
