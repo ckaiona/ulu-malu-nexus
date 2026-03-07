@@ -32,4 +32,7 @@ export const api = {
 
   // AI Pentest Agent
   analyzePentest: (body) => fetch(`${BASE}/pentest-analyze`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }).then(r => r.json()),
+
+  // Passive Recon (Tier 1)
+  reconTarget: (body) => fetch(`${BASE}/pentest-recon`, { method: 'POST', headers: headers(), body: JSON.stringify(body) }).then(r => r.json()),
 }
