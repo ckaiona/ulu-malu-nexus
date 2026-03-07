@@ -47,9 +47,18 @@ export default function VoiceCommander({ onNav, onClientHint }) {
     setStatus('idle')
   }, [])
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
     if (!supported) return
     if (wantListening.current) { stopListening(); return }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach(t => t.stop())
+    } catch {
+      setStatus('error')
+      setTimeout(() => setStatus('idle'), 2000)
+      return
+    }
 
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
 
