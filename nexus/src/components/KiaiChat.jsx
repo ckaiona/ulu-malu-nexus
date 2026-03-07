@@ -75,23 +75,33 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
   const supported = typeof window !== 'undefined' &&
     ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
 
-  const startVoice = useCallback(() => {
+  const startVoice = useCallback(async () => {
     if (!supported || listening) return
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      setMessages(m => [...m, { role: 'assistant', content: 'Mic access was blocked. Allow microphone in your browser settings and try again.' }])
+      return
+    }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     const rec = new SR()
     rec.lang = 'en-US'
     rec.interimResults = true
-    rec.continuous = false
+    rec.continuous = true
     recognitionRef.current = rec
     setListening(true)
 
     rec.onresult = (e) => {
       const text = Array.from(e.results).map(r => r[0].transcript).join('')
       setInput(text)
-      if (e.results[e.results.length - 1].isFinal) setListening(false)
     }
-    rec.onerror = () => setListening(false)
-    rec.onend   = () => setListening(false)
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed') {
+        setMessages(m => [...m, { role: 'assistant', content: 'Mic access was blocked. Allow microphone in your browser settings and try again.' }])
+      }
+      if (e.error !== 'no-speech') setListening(false)
+    }
+    rec.onend = () => setListening(false)
     rec.start()
   }, [supported, listening])
 
