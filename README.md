@@ -1,6 +1,40 @@
-# React + Vite
+# ULU MALU Nexus
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Command-and-control dashboard for ULU MALU Systems — built with React + Vite and backed by Azure & SharePoint.
+
+## SharePoint Lists Setup
+
+The dashboard reads live data from SharePoint lists. Run the included PowerShell script once to provision all required lists in your SharePoint site.
+
+### Prerequisites
+
+- [PowerShell 7+](https://learn.microsoft.com/powershell/scripting/install/installing-powershell)
+  - macOS: `brew install powershell`
+  - Windows: available from the Microsoft Store or via `winget install Microsoft.PowerShell`
+- A Microsoft 365 account with permission to create lists on the target site
+
+### Provision lists
+
+```powershell
+pwsh ~/create-sharepoint-lists.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/UluMalu"
+```
+
+The script:
+1. Installs **PnP.PowerShell** automatically if it is not already present.
+2. Opens an interactive browser login to your Microsoft 365 tenant.
+3. Creates the following lists (skips any that already exist):
+
+| List | Purpose |
+|---|---|
+| **Clients** | Client security-posture records |
+| **PentestEngagements** | Penetration-test engagement tracking |
+| **Threats** | Threat-intelligence log |
+| **AgentActivity** | AI-agent run history |
+| **Invoices** | Billing and invoice management |
+
+---
+
+## Frontend Development
 
 Currently, two official plugins are available:
 
