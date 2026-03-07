@@ -79,7 +79,8 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
   const startVoice = useCallback(async () => {
     if (!supported || listening) return
     try {
-      await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach(t => t.stop())
     } catch {
       setMessages(m => [...m, { role: 'assistant', content: 'Mic access was blocked. Allow microphone in your browser settings and try again.' }])
       return
