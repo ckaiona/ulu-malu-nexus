@@ -1,0 +1,277 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "ULU Malu NEXUS Security Operations API",
+    "description": "Security operations API for ULU Malu Systems — alerts, pentest analysis, passive reconnaissance, scan queue, and report generation.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://blue-meadow-061a5911e.2.azurestaticapps.net/api",
+      "description": "NEXUS production API"
+    }
+  ],
+  "paths": {
+    "/alerts": {
+      "get": {
+        "operationId": "getAlerts",
+        "summary": "Get security alerts",
+        "description": "Returns all current security alerts with severity, status, client, and description.",
+        "responses": {
+          "200": {
+            "description": "List of security alerts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Alert" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pentest-queue": {
+      "get": {
+        "operationId": "getScans",
+        "summary": "Get pentest scan queue",
+        "description": "Returns all queued, running, and completed penetration test scans.",
+        "responses": {
+          "200": {
+            "description": "List of scans",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Scan" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "queueScan",
+        "summary": "Queue a new pentest scan",
+        "description": "Adds a new penetration test scan to the queue. Requires prior written client authorization.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["client_name", "target_url", "scan_type"],
+                "properties": {
+                  "client_name": { "type": "string", "description": "Client name" },
+                  "target_url": { "type": "string", "description": "Target URL to scan" },
+                  "scan_type": {
+                    "type": "string",
+                    "enum": ["external", "internal", "web-app", "api"],
+                    "description": "Type of penetration test"
+                  },
+                  "authorization_status": { "type": "string", "default": "approved" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Scan queued successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Scan" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pentest-recon": {
+      "post": {
+        "operationId": "reconTarget",
+        "summary": "Run passive reconnaissance on a target",
+        "description": "Performs Tier-1 passive reconnaissance: probes security headers, TLS posture, technology fingerprints, CORS policy, cookie flags, robots.txt, and security.txt. No attack payloads sent. Only use on authorized targets.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["targetUrl"],
+                "properties": {
+                  "targetUrl": { "type": "string", "description": "Target URL, e.g. https://example.com" },
+                  "scanType": {
+                    "type": "string",
+                    "enum": ["external", "web-app", "api", "internal"],
+                    "description": "Scan type context"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recon results",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReconResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pentest-analyze": {
+      "post": {
+        "operationId": "analyzePentest",
+        "summary": "AI analysis of pentest findings",
+        "description": "Uses claude-opus-4-6 to analyze raw scan output (nmap, nuclei, Burp) and return structured findings with CVSS scores, OWASP categories, remediation steps, and an auto-written security playbook. If rawFindings is omitted, generates a threat model from target and scan type.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["clientName", "scanType"],
+                "properties": {
+                  "scanId": { "type": "string" },
+                  "clientName": { "type": "string", "description": "Client name" },
+                  "targetUrl": { "type": "string", "description": "Target URL" },
+                  "scanType": { "type": "string", "description": "Scan type" },
+                  "rawFindings": { "type": "string", "description": "Raw tool output to analyze. Leave empty for threat model." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI analysis results with findings and playbook",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AnalysisResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/report-generator": {
+      "post": {
+        "operationId": "generateReport",
+        "summary": "Generate a security report",
+        "description": "Generates an executive or technical security report for a client.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["clientName", "reportType"],
+                "properties": {
+                  "clientName": { "type": "string" },
+                  "reportType": {
+                    "type": "string",
+                    "enum": ["executive", "technical", "pentest-summary", "incident"]
+                  },
+                  "context": { "type": "string", "description": "Additional context or findings" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated report",
+            "content": { "application/json": { "schema": { "type": "object" } } }
+          }
+        }
+      }
+    },
+    "/audit-log": {
+      "get": {
+        "operationId": "getAuditLog",
+        "summary": "Get audit log",
+        "description": "Returns recent operator actions, AI decisions, and system events.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 50 },
+            "description": "Number of entries to return"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit log entries",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "type": "object" } } } }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Alert": {
+        "type": "object",
+        "properties": {
+          "AlertId": { "type": "string" },
+          "Severity": { "type": "string", "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] },
+          "Status": { "type": "string" },
+          "ClientName": { "type": "string" },
+          "Description": { "type": "string" },
+          "Timestamp": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Scan": {
+        "type": "object",
+        "properties": {
+          "ScanId": { "type": "string" },
+          "ClientName": { "type": "string" },
+          "ScanType": { "type": "string" },
+          "TargetUrl": { "type": "string" },
+          "Status": { "type": "string" },
+          "QueuedDate": { "type": "string" },
+          "FindingsCount": { "type": "integer" }
+        }
+      },
+      "ReconResult": {
+        "type": "object",
+        "properties": {
+          "reconData": { "type": "string", "description": "Human-readable recon report" },
+          "headers": { "type": "object" },
+          "techHeaders": { "type": "object" },
+          "corsHeaders": { "type": "object" },
+          "isHttps": { "type": "boolean" },
+          "statusCode": { "type": "integer" }
+        }
+      },
+      "AnalysisResult": {
+        "type": "object",
+        "properties": {
+          "findings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "severity": { "type": "string" },
+                "cvss": { "type": "number" },
+                "owasp": { "type": "string" },
+                "title": { "type": "string" },
+                "description": { "type": "string" },
+                "remediation": { "type": "string" }
+              }
+            }
+          },
+          "playbook": { "type": "string" },
+          "riskSummary": { "type": "string" },
+          "reportContext": { "type": "string" }
+        }
+      }
+    }
+  }
+}
