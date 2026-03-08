@@ -21,8 +21,8 @@ const WARN   = '#FF6B35'
 const TEXT   = '#C8E6F0'
 const DIM    = '#3A6080'
 
-const KIAI_URL = import.meta.env.VITE_KIAI_URL ||
-  'https://kiai-nexus-functions.azurewebsites.net/api/kiai_chat'
+// Memory-aware chat endpoint (falls back to external kiai_chat if ANTHROPIC_API_KEY not set)
+const KIAI_URL = '/api/kiai-memory-chat'
 
 // Strip [NAV:x] from display text and return { text, navTarget }
 function parseReply(reply) {
@@ -327,7 +327,7 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
               KIA'I
             </span>
             <span style={{ color: DIM, fontSize: 10, marginLeft: 'auto' }}>
-              {currentPage?.toUpperCase()} · claude-opus-4-6
+              {currentPage?.toUpperCase()} · claude-opus-4-6 · 🧠 MEMORY
             </span>
           </div>
 
