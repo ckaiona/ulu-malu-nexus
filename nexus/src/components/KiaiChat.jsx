@@ -82,10 +82,8 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
         loadSpeechSDK(),
         fetch('/api/speech-token').then(r => r.json())
       ])
-      const { token, region, endpoint } = res
-      const speechConfig = endpoint
-        ? SDK.SpeechConfig.fromEndpoint(new URL(`https://${new URL(endpoint).hostname}/`), token)
-        : SDK.SpeechConfig.fromAuthorizationToken(token, region)
+      const { token, region } = res
+      const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region)
       speechConfig.speechSynthesisVoiceName = 'en-US-AriaNeural'
       const synthesizer = new SDK.SpeechSynthesizer(speechConfig)
       synthesizerRef.current = synthesizer
@@ -123,10 +121,8 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
 
       if (!wantListening.current) return
 
-      const { token, region, endpoint } = res
-      const speechConfig = endpoint
-        ? SDK.SpeechConfig.fromEndpoint(new URL(`https://${new URL(endpoint).hostname}/`), token)
-        : SDK.SpeechConfig.fromAuthorizationToken(token, region)
+      const { token, region } = res
+      const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region)
       speechConfig.speechRecognitionLanguage = 'en-US'
       const audioConfig  = SDK.AudioConfig.fromDefaultMicrophoneInput()
       const recognizer   = new SDK.SpeechRecognizer(speechConfig, audioConfig)

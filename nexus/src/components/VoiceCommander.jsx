@@ -74,13 +74,11 @@ export default function VoiceCommander({ onNav, onClientHint }) {
     wantListening.current = true
 
     try {
-      const [SDK, { token, region, endpoint }] = await Promise.all([loadSpeechSDK(), fetchSpeechToken()])
+      const [SDK, { token, region }] = await Promise.all([loadSpeechSDK(), fetchSpeechToken()])
 
       if (!wantListening.current) return // user cancelled while loading
 
-      const speechConfig = endpoint
-        ? SDK.SpeechConfig.fromEndpoint(new URL(`https://${new URL(endpoint).hostname}/`), token)
-        : SDK.SpeechConfig.fromAuthorizationToken(token, region)
+      const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region)
       speechConfig.speechRecognitionLanguage = 'en-US'
       const audioConfig  = SDK.AudioConfig.fromDefaultMicrophoneInput()
       const recognizer   = new SDK.SpeechRecognizer(speechConfig, audioConfig)
