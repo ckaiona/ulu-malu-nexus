@@ -213,6 +213,105 @@ app.get('/health', (req, res) =>
   res.json({ status: 'ok', server: 'ulu-malu-nexus-mcp', tools: 8, nexusApi: NEXUS_API })
 )
 
+// ─── A2A (Agent2Agent) Protocol ───────────────────────────────────────────────
+
+const A2A_BASE = `https://nexus-mcp-server.nicebay-f86289ec.eastus2.azurecontainerapps.io`
+
+// Agent Card — required by A2A spec so orchestrators can discover capabilities
+app.get('/.well-known/agent.json', (req, res) => {
+  res.json({
+    name: 'NEXUS Security Ops',
+    description: 'ULU Malu NEXUS security operations agent. Handles security alerts, penetration testing queue, passive reconnaissance, AI pentest analysis, report generation, and audit logs.',
+    url: `${A2A_BASE}/a2a`,
+    version: '1.0.0',
+    capabilities: { streaming: false, pushNotifications: false },
+    skills: [
+      { id: 'get_alerts',          name: 'Get Security Alerts',      description: 'Return all current security alerts with severity, status, client, and description.' },
+      { id: 'get_scans',           name: 'Get Pentest Queue',         description: 'Return queued, running, and completed penetration test scans.' },
+      { id: 'recon_target',        name: 'Passive Recon',             description: 'Probe a target URL for security headers, TLS posture, tech fingerprints, CORS, and cookies. No attack payloads.' },
+      { id: 'analyze_pentest',     name: 'AI Pentest Analysis',       description: 'Analyze raw scan output and return structured findings with CVSS, OWASP categories, remediation, and a security playbook.' },
+      { id: 'queue_scan',          name: 'Queue Pentest Scan',        description: 'Add a new authorized penetration test scan to the NEXUS queue.' },
+      { id: 'generate_report',     name: 'Generate Security Report',  description: 'Generate an executive or technical security report for a client.' },
+      { id: 'get_audit_log',       name: 'Get Audit Log',             description: 'Return recent operator actions, AI decisions, and system events.' },
+      { id: 'run_pentest_pipeline',name: 'Run Full Pentest Pipeline',  description: 'Run passive recon then AI analysis in one call. Returns findings, playbook, and risk summary.' },
+    ]
+  })
+})
+
+// A2A message endpoint — handles task requests from orchestrators
+app.post('/a2a', async (req, res) => {
+  const { id, method, params } = req.body || {}
+  if (method !== 'tasks/send') {
+    return res.status(400).json({ jsonrpc: '2.0', id, error: { code: -32601, message: 'Method not supported' } })
+  }
+
+  const taskId   = params?.id || `task-${Date.now()}`
+  const userText = params?.message?.parts?.find(p => p.type === 'text')?.text || ''
+
+  try {
+    let result = ''
+    const lower = userText.toLowerCase()
+
+    if (lower.includes('alert')) {
+      const data = await nexus('/alerts')
+      result = JSON.stringify(data, null, 2)
+    } else if (lower.includes('scan') && lower.includes('queue')) {
+      const data = await nexus('/pentest-queue')
+      result = JSON.stringify(data, null, 2)
+    } else if (lower.includes('audit')) {
+      const data = await nexus('/audit-log?limit=20')
+      result = JSON.stringify(data, null, 2)
+    } else if (lower.includes('recon')) {
+      const urlMatch = userText.match(/https?:\/\/[^\s]+/)
+      if (!urlMatch) return res.json(a2aError(id, taskId, 'Please provide a target URL for recon.'))
+      const data = await nexus('/pentest-recon', 'POST', { targetUrl: urlMatch[0], scanType: 'external' })
+      result = data.reconData || JSON.stringify(data, null, 2)
+    } else if (lower.includes('analyz') || lower.includes('pentest')) {
+      const urlMatch = userText.match(/https?:\/\/[^\s]+/)
+      const clientMatch = userText.match(/for ([A-Za-z0-9 ]+?)(?:\s+at|\s+on|$)/)
+      const data = await nexus('/pentest-analyze', 'POST', {
+        clientName: clientMatch?.[1]?.trim() || 'Unknown Client',
+        targetUrl:  urlMatch?.[0] || '',
+        scanType:   'external',
+      })
+      result = data.riskSummary || JSON.stringify(data, null, 2)
+    } else if (lower.includes('report')) {
+      const clientMatch = userText.match(/for ([A-Za-z0-9 ]+?)(?:\s+report|$)/)
+      const data = await nexus('/report-generator', 'POST', {
+        clientName: clientMatch?.[1]?.trim() || 'Unknown Client',
+        reportType: lower.includes('technical') ? 'technical' : 'executive',
+      })
+      result = data.report || JSON.stringify(data, null, 2)
+    } else {
+      // Default: return alerts as general status
+      const data = await nexus('/alerts')
+      result = `NEXUS Status — ${data.length} active alerts:\n` + JSON.stringify(data, null, 2)
+    }
+
+    res.json({
+      jsonrpc: '2.0', id,
+      result: {
+        id: taskId,
+        status: { state: 'completed' },
+        artifacts: [{ parts: [{ type: 'text', text: result }] }]
+      }
+    })
+  } catch (err) {
+    res.json(a2aError(id, taskId, `NEXUS error: ${err.message}`))
+  }
+})
+
+function a2aError(id, taskId, message) {
+  return {
+    jsonrpc: '2.0', id,
+    result: {
+      id: taskId,
+      status: { state: 'failed', message },
+      artifacts: [{ parts: [{ type: 'text', text: message }] }]
+    }
+  }
+}
+
 const PORT = parseInt(process.env.PORT || '3000', 10)
 app.listen(PORT, () => {
   console.log(`ULU Malu NEXUS MCP Server — port ${PORT}`)
