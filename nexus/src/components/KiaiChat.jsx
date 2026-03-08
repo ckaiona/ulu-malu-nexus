@@ -54,12 +54,14 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
   const [loading,  setLoading]  = useState(false)
   const [image,    setImage]    = useState(null)   // { data: base64, media_type, previewUrl }
   const [dragOver, setDragOver] = useState(false)
-  const [listening, setListening] = useState(false)
+  const [listening,  setListening]  = useState(false)
+  const [ttsEnabled, setTtsEnabled] = useState(false)
 
   const bottomRef      = useRef(null)
   const inputRef       = useRef(null)
   const fileInputRef   = useRef(null)
   const recognitionRef = useRef(null)
+  const synthesizerRef = useRef(null)
   const wantListening  = useRef(false)
 
   // Scroll to bottom on new message
@@ -71,6 +73,27 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 100)
   }, [open])
+
+  // ── Text-to-speech ───────────────────────────────────────────────────────
+  const speakText = useCallback(async (text) => {
+    if (!text) return
+    try {
+      const [SDK, res] = await Promise.all([
+        loadSpeechSDK(),
+        fetch('/api/speech-token').then(r => r.json())
+      ])
+      const { token, region } = res
+      const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region)
+      speechConfig.speechSynthesisVoiceName = 'en-US-AriaNeural'
+      const synthesizer = new SDK.SpeechSynthesizer(speechConfig)
+      synthesizerRef.current = synthesizer
+      // Strip markdown and long JSON before speaking
+      const clean = text.replace(/```[\s\S]*?```/g, 'code block omitted')
+                        .replace(/\*\*/g, '').replace(/#{1,6} /g, '')
+                        .slice(0, 800)
+      synthesizer.speakTextAsync(clean, () => synthesizer.close(), () => synthesizer.close())
+    } catch (_) {}
+  }, [])
 
   // ── Voice dictation (Azure Speech SDK via CDN) ───────────────────────────
   function loadSpeechSDK() {
@@ -211,6 +234,7 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
       const { text: replyText, navTarget } = parseReply(data.reply || data.error || 'No response.')
 
       setMessages(prev => [...prev, { role: 'assistant', content: replyText }])
+      if (ttsEnabled) speakText(replyText)
 
       if (navTarget && onNav) {
         onNav(navTarget)
@@ -441,6 +465,23 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
                 style={{ display: 'none' }}
                 onChange={e => { if (e.target.files[0]) attachImage(e.target.files[0]); e.target.value = '' }}
               />
+
+              {/* Speaker toggle — reads Kia'i replies aloud */}
+              <button
+                onClick={() => setTtsEnabled(v => !v)}
+                title={ttsEnabled ? 'Mute Kia\'i voice' : 'Enable Kia\'i voice'}
+                style={{
+                  background: ttsEnabled ? `${A}22` : 'none',
+                  border: `1px solid ${ttsEnabled ? A : BORDER}`,
+                  color: ttsEnabled ? A : DIM,
+                  borderRadius: 6, padding: '4px 8px',
+                  cursor: 'pointer', fontSize: 14,
+                  boxShadow: ttsEnabled ? `0 0 8px ${A}44` : 'none',
+                  transition: 'all .2s',
+                }}
+              >
+                {ttsEnabled ? '🔊' : '🔇'}
+              </button>
 
               {/* Mic button — dictates into input (Azure Speech SDK) */}
               <button
