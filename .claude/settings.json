@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/ULUHi-tech/**)"
+    ],
+    "additionalDirectories": [
+      "/Users/ULUHi-tech/nexus-frontend/src/components"
+    ]
+  }
+}

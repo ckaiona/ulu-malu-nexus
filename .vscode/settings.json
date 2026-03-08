@@ -1,3 +1,23 @@
 {
-    "microsoft-sovereign-cloud.environment": "USGovernment"
+    "microsoft-sovereign-cloud.environment": "USGovernment",
+    "chat.tools.terminal.autoApprove": {
+        "cp": true,
+        "/^python3 - <<'PY'\nimport json, pathlib\np = pathlib\\.Path\\.home\\(\\)/\"azure_functions\"/\"local\\.settings\\.json\"\nprint\\(\"EXISTS\", p\\.exists\\(\\)\\)\nif p\\.exists\\(\\):\n    d = json\\.loads\\(p\\.read_text\\(\\)\\)\n    v = d\\.get\\(\"Values\", \\{\\}\\)\n    for k in \\[\"SHAREPOINT_TENANT_ID\",\"SHAREPOINT_CLIENT_ID\",\"SHAREPOINT_CLIENT_SECRET\",\"XAI_API_KEY\"\\]:\n        print\\(k, bool\\(v\\.get\\(k\\)\\)\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^pwsh -NoProfile -Command \"Install-Module PnP\\.PowerShell -Scope CurrentUser -Force -AllowClobber\" && pwsh ~/create-sharepoint-lists\\.ps1$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "az": true,
+        "/^TENANT_ID=\\$\\(az account show --query tenantId -o tsv\\)\nsed -i '' \"s\\|\\\\\"SHAREPOINT_TENANT_ID\\\\\": \\\\\"\\\\\"\\|\\\\\"SHAREPOINT_TENANT_ID\\\\\": \\\\\"\\$TENANT_ID\\\\\"\\|\" ~/azure_functions/local\\.settings\\.json\npython3 - <<'PY'\nimport json, pathlib\np = pathlib\\.Path\\.home\\(\\)/\"azure_functions\"/\"local\\.settings\\.json\"\nv = json\\.loads\\(p\\.read_text\\(\\)\\)\\[\"Values\"\\]\nprint\\(\"SHAREPOINT_TENANT_ID_SET\", bool\\(v\\.get\\(\"SHAREPOINT_TENANT_ID\"\\)\\)\\)\nprint\\(\"SHAREPOINT_CLIENT_ID_SET\", bool\\(v\\.get\\(\"SHAREPOINT_CLIENT_ID\"\\)\\)\\)\nprint\\(\"SHAREPOINT_CLIENT_SECRET_SET\", bool\\(v\\.get\\(\"SHAREPOINT_CLIENT_SECRET\"\\)\\)\\)\nprint\\(\"XAI_API_KEY_SET\", bool\\(v\\.get\\(\"XAI_API_KEY\"\\)\\)\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^python3 - <<'PY'\nimport json, pathlib\np = pathlib\\.Path\\.home\\(\\)/\"azure_functions\"/\"local\\.settings\\.json\"\nv = json\\.loads\\(p\\.read_text\\(\\)\\)\\[\"Values\"\\]\nprint\\(bool\\(v\\.get\\(\"SHAREPOINT_TENANT_ID\"\\)\\), bool\\(v\\.get\\(\"SHAREPOINT_CLIENT_ID\"\\)\\), bool\\(v\\.get\\(\"SHAREPOINT_CLIENT_SECRET\"\\)\\), bool\\(v\\.get\\(\"XAI_API_KEY\"\\)\\)\\)\nPY$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
 }

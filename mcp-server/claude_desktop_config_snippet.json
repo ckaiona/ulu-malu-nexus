@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "ulu-malu-nexus": {
+      "url": "https://nexus-mcp-server.nicebay-f86289ec.eastus2.azurecontainerapps.io/sse"
+    }
+  }
+}
