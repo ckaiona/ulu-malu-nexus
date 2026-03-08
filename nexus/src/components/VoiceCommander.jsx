@@ -142,7 +142,7 @@ export default function VoiceCommander({ onNav, onClientHint }) {
     recognizerRef.current?.close()
   }, [])
 
-  const stateColor = { idle: '#2A5A7A', listening: A, processing: '#FFD166', error: WARN }[status]
+  const stateColor = { idle: A, listening: A, processing: '#FFD166', error: WARN }[status]
   const stateLabel = { idle: '', listening: 'LISTENING', processing: 'PROCESSING', error: 'ERROR' }[status]
 
   return (
@@ -169,10 +169,10 @@ export default function VoiceCommander({ onNav, onClientHint }) {
         title={status === 'listening' ? 'Stop listening' : 'Voice command'}
         style={{
           width: 32, height: 32, borderRadius: '50%', border: `1px solid ${stateColor}`,
-          background: status === 'listening' ? `${A}22` : 'transparent',
+          background: status === 'listening' ? `${A}22` : `${A}11`,
           color: stateColor, cursor: 'pointer', display: 'flex', alignItems: 'center',
           justifyContent: 'center', fontSize: 14, transition: 'all .2s',
-          boxShadow: status === 'listening' ? `0 0 12px ${A}66` : 'none',
+          boxShadow: status === 'listening' ? `0 0 12px ${A}66` : `0 0 6px ${A}33`,
           flexShrink: 0
         }}
       >

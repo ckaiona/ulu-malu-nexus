@@ -39,9 +39,11 @@ function MiniBar({ v, accent }) {
 
 // Mock data reflecting full service portfolio
 const MOCK_CLIENTS = [
-  { name: 'HEMIC',           riskScore: 12, cloudHealth: 98, appUptime: 99.9, complianceScore: 94, alerts: 1,  aiUtilization: 76, status: 'secure'   },
-  { name: 'HMSA',            riskScore: 21, cloudHealth: 95, appUptime: 99.1, complianceScore: 88, alerts: 2,  aiUtilization: 41, status: 'secure'   },
-  { name: 'Pacific Defense', riskScore: 8,  cloudHealth: 99, appUptime: 100,  complianceScore: 97, alerts: 0,  aiUtilization: 60, status: 'secure'   },
+  { name: 'HEMIC Health',    riskScore: 12, cloudHealth: 98, appUptime: 99.9, complianceScore: 94, alerts: 1,  aiUtilization: 76, status: 'secure'  },
+  { name: 'HMSA',            riskScore: 21, cloudHealth: 95, appUptime: 99.1, complianceScore: 88, alerts: 2,  aiUtilization: 41, status: 'secure'  },
+  { name: 'Pacific Defense', riskScore: 8,  cloudHealth: 99, appUptime: 100,  complianceScore: 97, alerts: 0,  aiUtilization: 60, status: 'secure'  },
+  { name: 'KoreTech Labs',   riskScore: 34, cloudHealth: 91, appUptime: 98.5, complianceScore: 79, alerts: 1,  aiUtilization: 55, status: 'warning' },
+  { name: 'SentinelOne',     riskScore: 5,  cloudHealth: 99, appUptime: 99.8, complianceScore: 99, alerts: 0,  aiUtilization: 88, status: 'secure'  },
 ]
 
 const MOCK_ALERTS = [

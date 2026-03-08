@@ -23,7 +23,7 @@ const EXECS = [
   { name: 'Eric Daley – CTO',        value: 'Eric Daley',       focus: 'Technical architecture, threat landscape, system health, agent performance' },
 ]
 
-const CLIENTS = ['HEMIC', 'HMSA', 'Pacific Defense', 'Internal – ULU Malu']
+const CLIENTS = ['HEMIC Health', 'HMSA', 'Pacific Defense', 'KoreTech Labs', 'SentinelOne', 'Internal – ULU Malu']
 
 export default function BriefingGenerator() {
   const [form, setForm] = useState({
