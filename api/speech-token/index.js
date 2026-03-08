@@ -1,53 +1,81 @@
 const https = require('https')
+const { URL } = require('url')
 
 /**
- * Returns a short-lived Azure Cognitive Services speech token.
- * Token is valid for 10 minutes. The subscription key stays server-side.
+ * Returns a short-lived Azure Speech token.
+ * Supports both:
+ *  - Classic regional endpoint: ${region}.api.cognitive.microsoft.com
+ *  - Azure AI Services (multi-service) endpoint: ai-*.cognitiveservices.azure.com
+ *
+ * SWA app settings required:
+ *   SPEECH_KEY      — subscription key (from AI Services resource)
+ *   SPEECH_REGION   — Azure region, e.g. eastus (used by Speech SDK)
+ *   SPEECH_ENDPOINT — (optional) custom endpoint, e.g. https://ai-xgsn7koaekgj6.cognitiveservices.azure.com
+ *
+ * Token is valid for 10 minutes. The key never leaves the server.
  */
 module.exports = async function (context, req) {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    context.res = { status: 204, headers: corsHeaders() }
+    context.res = { status: 204, headers: cors() }
     return
   }
 
-  const key    = process.env.SPEECH_KEY
-  const region = process.env.SPEECH_REGION || 'eastus'
+  const key      = process.env.SPEECH_KEY
+  const region   = process.env.SPEECH_REGION   || 'eastus'
+  const endpoint = process.env.SPEECH_ENDPOINT || null
 
   if (!key) {
     context.res = {
       status: 500,
-      headers: corsHeaders(),
-      body: JSON.stringify({ error: 'Speech key not configured on server.' })
+      headers: cors(),
+      body: JSON.stringify({ error: 'SPEECH_KEY not configured.' })
     }
     return
   }
 
   try {
-    const token = await issueToken(key, region)
+    const token = await issueToken(key, region, endpoint)
     context.res = {
       status: 200,
-      headers: { ...corsHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, region })
+      headers: { ...cors(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        region,
+        // Pass the AI Services hostname back so the SDK can use it as a custom endpoint
+        endpoint: endpoint || null,
+      })
     }
   } catch (e) {
     context.res = {
       status: 502,
-      headers: corsHeaders(),
+      headers: cors(),
       body: JSON.stringify({ error: `Token error: ${e.message}` })
     }
   }
 }
 
-function issueToken(key, region) {
+function issueToken(key, region, customEndpoint) {
   return new Promise((resolve, reject) => {
-    const options = {
-      hostname: `${region}.api.cognitive.microsoft.com`,
-      path: '/sts/v1.0/issuetoken',
-      method: 'POST',
-      headers: { 'Ocp-Apim-Subscription-Key': key, 'Content-Length': '0' }
+    // Use custom AI Services endpoint if provided, otherwise fall back to regional STS
+    let hostname, path
+    if (customEndpoint) {
+      const parsed = new URL(customEndpoint.endsWith('/') ? customEndpoint.slice(0, -1) : customEndpoint)
+      hostname = parsed.hostname
+      path = '/sts/v1.0/issuetoken'
+    } else {
+      hostname = `${region}.api.cognitive.microsoft.com`
+      path = '/sts/v1.0/issuetoken'
     }
-    const req = https.request(options, res => {
+
+    const opts = {
+      hostname,
+      path,
+      method: 'POST',
+      headers: { 'Ocp-Apim-Subscription-Key': key, 'Content-Length': '0' },
+      timeout: 10000,
+    }
+
+    const req = https.request(opts, res => {
       let data = ''
       res.on('data', d => { data += d })
       res.on('end', () => {
@@ -56,14 +84,15 @@ function issueToken(key, region) {
       })
     })
     req.on('error', reject)
+    req.on('timeout', () => req.destroy(new Error('STS timeout')))
     req.end()
   })
 }
 
-function corsHeaders() {
+function cors() {
   return {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin':  '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type'
+    'Access-Control-Allow-Headers': 'Content-Type',
   }
 }
