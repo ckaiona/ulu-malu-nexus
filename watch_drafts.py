@@ -21,6 +21,7 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import URLError
 from azure.data.tables import TableServiceClient
+from kiai_memory import get_memories, save_memory, format_for_prompt
 
 # ── Config ────────────────────────────────────────────────────────────────────
 SCRIPTS_DIR = Path(__file__).parent
@@ -79,19 +80,26 @@ def parse_eml(path):
     return subject, sender, to, body[:3000]
 
 # ── AI draft generation ───────────────────────────────────────────────────────
-def generate_draft(subject, sender, body):
+def generate_draft(subject, sender, body, client: str = ""):
     if not ANTHROPIC_API_KEY:
         log.warning("ANTHROPIC_API_KEY not set — storing placeholder draft")
         return f"[AI draft unavailable — set ANTHROPIC_API_KEY]\n\nRe: {subject}"
+
+    # Load persistent memory for context
+    memories = get_memories(client=client, top=20)
+    mem_block = format_for_prompt(memories)
+    system = (
+        "You are Kia'i, the AI assistant for ULU Malu Systems. "
+        "Draft a concise, professional email reply on behalf of Camille Aiona. "
+        "Be warm, direct, and action-oriented. No timelines or dates. "
+        "Reply in plain text only — no markdown."
+        + (f"\n\n{mem_block}" if mem_block else "")
+    )
+
     payload = json.dumps({
         "model": "claude-opus-4-6",
         "max_tokens": 512,
-        "system": (
-            "You are Kia'i, the AI assistant for ULU Malu Systems. "
-            "Draft a concise, professional email reply on behalf of Camille Aiona. "
-            "Be warm, direct, and action-oriented. No timelines or dates. "
-            "Reply in plain text only — no markdown."
-        ),
+        "system": system,
         "messages": [{
             "role": "user",
             "content": f"Draft a reply to this email.\n\nFrom: {sender}\nSubject: {subject}\n\n{body}"
@@ -148,8 +156,13 @@ def process_file(tc, path):
         log.info(f"  Subject: {subject[:60]}")
         log.info(f"  From:    {sender[:50]}")
         log.info(f"  Generating AI draft...")
-        draft_body = generate_draft(subject, sender, body)
+        client_name = sender.split("<")[0].strip() or sender
+        draft_body = generate_draft(subject, sender, body, client=client_name)
         save_draft(tc, draft_id, subject, sender, to, body, draft_body)
+        save_memory(
+            f"Drafted reply to '{subject[:80]}' from {client_name}",
+            type="draft", client=client_name, page="drafts", importance=3
+        )
         # Move to processed/
         DONE_DIR.mkdir(exist_ok=True)
         dest = DONE_DIR / path.name

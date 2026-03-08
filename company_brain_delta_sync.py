@@ -19,6 +19,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 load_dotenv()
 
+from kiai_memory import save_memory
+
 # === YOUR EXISTING SETTINGS ===
 SEARCH_ENDPOINT = os.getenv("AZURE_SEARCH_ENDPOINT")      # e.g. https://your-search.search.windows.net
 SEARCH_KEY = os.getenv("AZURE_SEARCH_KEY")               # or use DefaultAzureCredential
@@ -96,9 +98,14 @@ async def delta_sync():
             print(f"Uploaded {len(docs)} chunked documents from {name}")
 
         # Save new deltaLink
+        doc_count = len(docs)
         tokens[name] = result.next_link or result.delta_link
         with open(delta_token_path, 'w') as f:
             json.dump(tokens, f)
+        save_memory(
+            f"Company brain delta sync: {doc_count} chunks indexed from {name}",
+            type="sync", page="dashboard", importance=2
+        )
 
     with open(delta_token_path, "w") as f:
         json.dump(tokens, f)

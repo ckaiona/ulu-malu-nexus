@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.17/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.17",
+  "version": "1.0.0",
+  "id": "a3f7c2e1-4b8d-4f9a-8c3e-2d1b5f6a7e9c",
+  "name": {
+    "short": "NEXUS",
+    "full": "ULU Malu NEXUS — AI Security Operations"
+  },
+  "description": {
+    "short": "AI-powered security ops dashboard",
+    "full": "NEXUS is ULU Malu Systems' AI security operations center — email drafts, pentest analysis, threat intelligence, and Kia'i AI assistant in one dashboard."
+  },
+  "developer": {
+    "name": "ULU Malu Systems",
+    "websiteUrl": "https://blue-meadow-061a5911e.2.azurestaticapps.net",
+    "privacyUrl": "https://blue-meadow-061a5911e.2.azurestaticapps.net",
+    "termsOfUseUrl": "https://blue-meadow-061a5911e.2.azurestaticapps.net"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#00E6C3",
+  "staticTabs": [
+    {
+      "entityId": "nexus-dashboard",
+      "name": "Dashboard",
+      "contentUrl": "https://blue-meadow-061a5911e.2.azurestaticapps.net",
+      "websiteUrl": "https://blue-meadow-061a5911e.2.azurestaticapps.net",
+      "scopes": ["personal", "team"]
+    },
+    {
+      "entityId": "nexus-drafts",
+      "name": "Email Drafts",
+      "contentUrl": "https://blue-meadow-061a5911e.2.azurestaticapps.net/#/drafts",
+      "websiteUrl": "https://blue-meadow-061a5911e.2.azurestaticapps.net/#/drafts",
+      "scopes": ["personal", "team"]
+    },
+    {
+      "entityId": "nexus-pentest",
+      "name": "Pentest",
+      "contentUrl": "https://blue-meadow-061a5911e.2.azurestaticapps.net/#/pentest",
+      "websiteUrl": "https://blue-meadow-061a5911e.2.azurestaticapps.net/#/pentest",
+      "scopes": ["personal", "team"]
+    }
+  ],
+  "validDomains": [
+    "blue-meadow-061a5911e.2.azurestaticapps.net"
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "showLoadingIndicator": true
+}

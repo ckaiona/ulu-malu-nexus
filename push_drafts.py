@@ -16,6 +16,7 @@ from email.policy import default as email_policy
 from pathlib import Path
 from urllib.request import Request, urlopen
 from azure.data.tables import TableServiceClient
+from kiai_memory import get_memories, save_memory, format_for_prompt
 
 # ── Config ────────────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -58,19 +59,26 @@ def parse_eml(path):
         body = msg.get_content() or ""
     return subject, sender, to, body[:3000]
 
-def generate_draft(subject, sender, body):
+def generate_draft(subject, sender, body, client: str = ""):
     if not ANTHROPIC_API_KEY:
         return f"[ANTHROPIC_API_KEY not set] Draft for: {subject}"
     import urllib.request, json as j
+
+    # Load persistent memory for context
+    memories = get_memories(client=client, top=20)
+    mem_block = format_for_prompt(memories)
+    system = (
+        "You are Kia'i, the AI assistant for ULU Malu Systems. "
+        "Draft a concise, professional email reply on behalf of Camille Aiona. "
+        "Be warm, direct, and action-oriented. No timelines or dates. "
+        "Reply in plain text only — no markdown."
+        + (f"\n\n{mem_block}" if mem_block else "")
+    )
+
     payload = j.dumps({
         "model": "claude-opus-4-6",
         "max_tokens": 512,
-        "system": (
-            "You are Kia'i, the AI assistant for ULU Malu Systems. "
-            "Draft a concise, professional email reply on behalf of Camille Aiona. "
-            "Be warm, direct, and action-oriented. No timelines or dates. "
-            "Reply in plain text only — no markdown."
-        ),
+        "system": system,
         "messages": [{
             "role": "user",
             "content": f"Draft a reply to this email.\n\nFrom: {sender}\nSubject: {subject}\n\n{body}"
@@ -136,10 +144,15 @@ def main():
             subject, sender, to, body = parse_eml(path)
             draft_id = hashlib.md5(str(path).encode()).hexdigest()[:12]
             print(f"  [{draft_id}] {subject[:60]} — from {sender[:40]}")
+            client_name = sender.split("<")[0].strip() or sender
             print(f"    Generating draft...", end=" ", flush=True)
-            draft_body = generate_draft(subject, sender, body)
+            draft_body = generate_draft(subject, sender, body, client=client_name)
             print("done")
             save_draft(tc, draft_id, subject, sender, to, body, draft_body)
+            save_memory(
+                f"Drafted reply to '{subject[:80]}' from {client_name}",
+                type="draft", client=client_name, page="drafts", importance=3
+            )
             saved += 1
         except Exception as e:
             print(f"    ERROR: {e}")
