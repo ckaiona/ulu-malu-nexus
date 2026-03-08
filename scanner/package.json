@@ -1,0 +1,7 @@
+{
+  "name": "nexus-scanner",
+  "version": "1.0.0",
+  "description": "NEXUS Tier-2 active scanner — nmap + nuclei",
+  "main": "scan.js",
+  "dependencies": {}
+}

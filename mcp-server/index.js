@@ -213,6 +213,97 @@ app.get('/health', (req, res) =>
   res.json({ status: 'ok', server: 'ulu-malu-nexus-mcp', tools: 8, nexusApi: NEXUS_API })
 )
 
+// ─── Scan Trigger — called by SWA pentest-run function ────────────────────────
+// Uses this Container App's managed identity to start the nexus-scanner job.
+
+const SUB = process.env.AZURE_SUBSCRIPTION_ID || ''
+const RG  = process.env.AZURE_RESOURCE_GROUP  || 'rg-uluguardian'
+const JOB = process.env.SCANNER_JOB_NAME      || 'nexus-scanner'
+
+async function getMsiToken(resource = 'https://management.azure.com/') {
+  const endpoint = process.env.IDENTITY_ENDPOINT
+  const header   = process.env.IDENTITY_HEADER
+  if (!endpoint) throw new Error('IDENTITY_ENDPOINT not set — enable managed identity on this Container App')
+
+  const url = new URL(endpoint)
+  url.searchParams.set('resource', resource)
+  url.searchParams.set('api-version', '2019-08-01')
+
+  const resp = await fetch(url.href, { headers: { 'X-IDENTITY-HEADER': header } })
+  if (!resp.ok) throw new Error(`MSI error ${resp.status}: ${await resp.text()}`)
+  const { access_token } = await resp.json()
+  if (!access_token) throw new Error('No access_token in MSI response')
+  return access_token
+}
+
+app.post('/trigger-scan', async (req, res) => {
+  const { scanId, clientName, targetUrl, scanType } = req.body || {}
+
+  if (!targetUrl || !clientName || !scanType) {
+    return res.status(400).json({ error: 'targetUrl, clientName, scanType required' })
+  }
+
+  // Block private addresses
+  try {
+    const parsed = new URL(targetUrl.startsWith('http') ? targetUrl : `https://${targetUrl}`)
+    if (/^(localhost|127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(parsed.hostname)) {
+      return res.status(403).json({ error: 'Scanning internal addresses not permitted' })
+    }
+  } catch {
+    return res.status(400).json({ error: 'Invalid targetUrl' })
+  }
+
+  if (!SUB) {
+    return res.status(503).json({ error: 'AZURE_SUBSCRIPTION_ID not configured on MCP server' })
+  }
+
+  try {
+    const token = await getMsiToken()
+    const jobPath = `/subscriptions/${SUB}/resourceGroups/${RG}/providers/Microsoft.App/jobs/${JOB}/start?api-version=2024-03-01`
+
+    const body = JSON.stringify({
+      template: {
+        containers: [{
+          name: 'scanner',
+          env: [
+            { name: 'TARGET_URL',         value: targetUrl },
+            { name: 'SCAN_TYPE',          value: scanType },
+            { name: 'CLIENT_NAME',        value: clientName },
+            { name: 'SCAN_ID',            value: scanId || '' },
+            { name: 'NEXUS_API',          value: NEXUS_API },
+            { name: 'NEXUS_FUNCTION_KEY', value: FUNCTION_KEY },
+          ]
+        }]
+      }
+    })
+
+    const jobResp = await fetch(`https://management.azure.com${jobPath}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body,
+    })
+
+    if (!jobResp.ok) {
+      const errText = await jobResp.text()
+      return res.status(502).json({ error: `Azure job start failed ${jobResp.status}: ${errText}` })
+    }
+
+    const jobData = await jobResp.json().catch(() => ({}))
+    console.log(`Scan started: ${clientName} → ${targetUrl} (job: ${jobData.name || 'unknown'})`)
+
+    res.json({
+      message:          `Scan started for ${clientName}`,
+      jobExecutionName: jobData.name,
+      scanId,
+      targetUrl,
+      estimatedDuration: '3-8 minutes',
+    })
+  } catch (e) {
+    console.error('trigger-scan error:', e.message)
+    res.status(502).json({ error: e.message })
+  }
+})
+
 // ─── A2A (Agent2Agent) Protocol ───────────────────────────────────────────────
 
 const A2A_BASE = `https://nexus-mcp-server.nicebay-f86289ec.eastus2.azurecontainerapps.io`
