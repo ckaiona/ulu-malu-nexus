@@ -1,0 +1,118 @@
+2026-03-08 08:28:32,673  INFO  Email watcher started. Watching: /Users/ULUHi-tech/Downloads/eml_export/ULU-Malu
+2026-03-08 08:28:32,673  INFO  Email watcher started. Watching: /Users/ULUHi-tech/Downloads/eml_export/ULU-Malu
+2026-03-08 08:28:32,673  INFO  Poll interval: 30s
+2026-03-08 08:28:32,673  INFO  Poll interval: 30s
+2026-03-08 08:28:33,195  INFO  Request URL: 'https://ulunexusmemory.table.core.windows.net/Tables'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json;odata=nometadata'
+    'Content-Length': '28'
+    'x-ms-version': 'REDACTED'
+    'DataServiceVersion': 'REDACTED'
+    'Accept': 'application/json;odata=minimalmetadata'
+    'x-ms-client-request-id': '9cfb4570-1b1c-11f1-988c-c265d5af57a0'
+    'x-ms-date': 'REDACTED'
+    'Date': 'Sun, 08 Mar 2026 18:28:33 GMT'
+    'User-Agent': 'azsdk-python-data-tables/12.7.0 Python/3.11.14 (macOS-15.1-arm64-arm-64bit)'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2026-03-08 08:28:33,195  INFO  Request URL: 'https://ulunexusmemory.table.core.windows.net/Tables'
+Request method: 'POST'
+Request headers:
+    'Content-Type': 'application/json;odata=nometadata'
+    'Content-Length': '28'
+    'x-ms-version': 'REDACTED'
+    'DataServiceVersion': 'REDACTED'
+    'Accept': 'application/json;odata=minimalmetadata'
+    'x-ms-client-request-id': '9cfb4570-1b1c-11f1-988c-c265d5af57a0'
+    'x-ms-date': 'REDACTED'
+    'Date': 'Sun, 08 Mar 2026 18:28:33 GMT'
+    'User-Agent': 'azsdk-python-data-tables/12.7.0 Python/3.11.14 (macOS-15.1-arm64-arm-64bit)'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2026-03-08 08:28:33,926  INFO  Response status: 409
+Response headers:
+    'Cache-Control': 'no-cache'
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json;odata=minimalmetadata;streaming=true;charset=utf-8'
+    'Server': 'Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '0074193e-9002-0013-7a29-affa74000000'
+    'x-ms-client-request-id': '9cfb4570-1b1c-11f1-988c-c265d5af57a0'
+    'x-ms-version': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Sun, 08 Mar 2026 18:28:32 GMT'
+2026-03-08 08:28:33,926  INFO  Response status: 409
+Response headers:
+    'Cache-Control': 'no-cache'
+    'Transfer-Encoding': 'chunked'
+    'Content-Type': 'application/json;odata=minimalmetadata;streaming=true;charset=utf-8'
+    'Server': 'Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '0074193e-9002-0013-7a29-affa74000000'
+    'x-ms-client-request-id': '9cfb4570-1b1c-11f1-988c-c265d5af57a0'
+    'x-ms-version': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Sun, 08 Mar 2026 18:28:32 GMT'
+2026-03-08 08:28:33,928  INFO  Azure Table Storage connected.
+2026-03-08 08:28:33,928  INFO  Azure Table Storage connected.
+2026-03-08 08:28:35,436  INFO  New email: Todyl Incident - Management Portal Unavailable - 13 February 2026 2.eml  [37a674b2d176]
+2026-03-08 08:28:35,436  INFO  New email: Todyl Incident - Management Portal Unavailable - 13 February 2026 2.eml  [37a674b2d176]
+2026-03-08 08:28:35,453  INFO    Subject: Todyl Incident - Management Portal Unavailable - 13 February
+2026-03-08 08:28:35,453  INFO    Subject: Todyl Incident - Management Portal Unavailable - 13 February
+2026-03-08 08:28:35,454  INFO    From:    noreply@statuspage.io
+2026-03-08 08:28:35,454  INFO    From:    noreply@statuspage.io
+2026-03-08 08:28:35,459  INFO    Generating AI draft...
+2026-03-08 08:28:35,459  INFO    Generating AI draft...
+2026-03-08 08:28:39,205  INFO  Request URL: 'https://ulunexusmemory.table.core.windows.net/NexusDrafts(PartitionKey='draft',RowKey='8226969480796-29168')'
+Request method: 'PATCH'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '1657'
+    'x-ms-version': 'REDACTED'
+    'DataServiceVersion': 'REDACTED'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'a09070ca-1b1c-11f1-988c-c265d5af57a0'
+    'x-ms-date': 'REDACTED'
+    'Date': 'Sun, 08 Mar 2026 18:28:39 GMT'
+    'User-Agent': 'azsdk-python-data-tables/12.7.0 Python/3.11.14 (macOS-15.1-arm64-arm-64bit)'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2026-03-08 08:28:39,205  INFO  Request URL: 'https://ulunexusmemory.table.core.windows.net/NexusDrafts(PartitionKey='draft',RowKey='8226969480796-29168')'
+Request method: 'PATCH'
+Request headers:
+    'Content-Type': 'application/json'
+    'Content-Length': '1657'
+    'x-ms-version': 'REDACTED'
+    'DataServiceVersion': 'REDACTED'
+    'Accept': 'application/json'
+    'x-ms-client-request-id': 'a09070ca-1b1c-11f1-988c-c265d5af57a0'
+    'x-ms-date': 'REDACTED'
+    'Date': 'Sun, 08 Mar 2026 18:28:39 GMT'
+    'User-Agent': 'azsdk-python-data-tables/12.7.0 Python/3.11.14 (macOS-15.1-arm64-arm-64bit)'
+    'Authorization': 'REDACTED'
+A body is sent with the request
+2026-03-08 08:28:39,338  INFO  Response status: 204
+Response headers:
+    'Cache-Control': 'no-cache'
+    'Content-Length': '0'
+    'ETag': 'W/"datetime'2026-03-08T18%3A28%3A39.3431715Z'"'
+    'Server': 'Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '00741cb7-9002-0013-4a29-affa74000000'
+    'x-ms-client-request-id': 'a09070ca-1b1c-11f1-988c-c265d5af57a0'
+    'x-ms-version': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Sun, 08 Mar 2026 18:28:38 GMT'
+2026-03-08 08:28:39,338  INFO  Response status: 204
+Response headers:
+    'Cache-Control': 'no-cache'
+    'Content-Length': '0'
+    'ETag': 'W/"datetime'2026-03-08T18%3A28%3A39.3431715Z'"'
+    'Server': 'Windows-Azure-Table/1.0 Microsoft-HTTPAPI/2.0'
+    'x-ms-request-id': '00741cb7-9002-0013-4a29-affa74000000'
+    'x-ms-client-request-id': 'a09070ca-1b1c-11f1-988c-c265d5af57a0'
+    'x-ms-version': 'REDACTED'
+    'X-Content-Type-Options': 'REDACTED'
+    'Date': 'Sun, 08 Mar 2026 18:28:38 GMT'
+2026-03-08 08:28:39,339  INFO    Saved draft 37a674b2d176 → 'Re: Todyl Incident - Management Portal Unavailable - 13 Febr'
+2026-03-08 08:28:39,339  INFO    Saved draft 37a674b2d176 → 'Re: Todyl Incident - Management Portal Unavailable - 13 Febr'
+2026-03-08 08:28:39,341  INFO    Moved to processed/Todyl Incident - Management Portal Unavailable - 13 February 2026 2.eml
+2026-03-08 08:28:39,341  INFO    Moved to processed/Todyl Incident - Management Portal Unavailable - 13 February 2026 2.eml
