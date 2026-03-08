@@ -455,9 +455,9 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
                 onClick={() => fileInputRef.current?.click()}
                 title="Attach image"
                 style={{
-                  background: 'none', border: `1px solid ${BORDER}`,
-                  color: DIM, borderRadius: 6, padding: '4px 8px',
-                  cursor: 'pointer', fontSize: 14,
+                  background: '#0A1A2A', border: `1px solid #2A5A7A`,
+                  color: '#5A9ABA', borderRadius: 6, padding: '4px 10px',
+                  cursor: 'pointer', fontSize: 15,
                 }}
               >
                 📎
@@ -475,11 +475,11 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
                 onClick={() => setTtsEnabled(v => !v)}
                 title={ttsEnabled ? 'Mute Kia\'i voice' : 'Enable Kia\'i voice'}
                 style={{
-                  background: ttsEnabled ? `${A}22` : 'none',
-                  border: `1px solid ${ttsEnabled ? A : BORDER}`,
-                  color: ttsEnabled ? A : DIM,
-                  borderRadius: 6, padding: '4px 8px',
-                  cursor: 'pointer', fontSize: 14,
+                  background: ttsEnabled ? `${A}22` : '#0A1A2A',
+                  border: `1px solid ${ttsEnabled ? A : '#2A5A7A'}`,
+                  color: ttsEnabled ? A : '#5A9ABA',
+                  borderRadius: 6, padding: '4px 10px',
+                  cursor: 'pointer', fontSize: 15,
                   boxShadow: ttsEnabled ? `0 0 8px ${A}44` : 'none',
                   transition: 'all .2s',
                 }}
@@ -489,20 +489,21 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
 
               {/* Mic button — dictates into input (Azure Speech SDK) */}
               <button
-                  onClick={listening ? stopVoice : startVoice}
-                  title={listening ? 'Stop dictation' : 'Dictate message'}
-                  style={{
-                    background: listening ? `${A}22` : 'none',
-                    border: `1px solid ${listening ? A : BORDER}`,
-                    color: listening ? A : DIM,
-                    borderRadius: 6, padding: '4px 8px',
-                    cursor: 'pointer', fontSize: 14,
-                    boxShadow: listening ? `0 0 8px ${A}44` : 'none',
-                    transition: 'all .2s',
-                  }}
-                >
-                  {listening ? '⏹' : '🎙'}
-                </button>
+                onClick={listening ? stopVoice : startVoice}
+                title={listening ? 'Stop dictation' : 'Dictate message'}
+                style={{
+                  background: listening ? `${A}22` : '#0A1A2A',
+                  border: `1px solid ${listening ? A : '#2A5A7A'}`,
+                  color: listening ? A : '#5A9ABA',
+                  borderRadius: 6, padding: '4px 10px',
+                  cursor: 'pointer', fontSize: 15,
+                  boxShadow: listening ? `0 0 8px ${A}66` : 'none',
+                  transition: 'all .2s',
+                  animation: listening ? 'pulse 1s infinite' : 'none',
+                }}
+              >
+                {listening ? '⏹' : '🎙'}
+              </button>
 
               {/* Send */}
               <button
