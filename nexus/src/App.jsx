@@ -1,116 +1,45 @@
-import { useState, useCallback } from 'react'
-import Sidebar from './components/Sidebar'
-import Header from './components/Header'
-import KiaiChat from './components/KiaiChat'
-import Dashboard from './pages/Dashboard'
-import ReviewDrafts from './pages/ReviewDrafts'
-import BriefingGenerator from './pages/BriefingGenerator'
-import PentestQueue from './pages/PentestQueue'
-import AuditLog from './pages/AuditLog'
-import Analytics from './pages/Analytics'
-
-const A = '#00E6C3', WARN = '#FF6B35', GREEN = '#00FF88', BORDER = '#1A3A5C', CARD = '#0D1F35'
-
-const QUICK_ACTIONS = [
-  ['⬡', 'LAUNCH PENTEST',   A,        'pentest'],
-  ['◈', 'DEPLOY AI AGENT',  '#00AAFF','dashboard'],
-  ['◆', 'SEND OUTREACH',    '#FFD166','drafts'],
-  ['◉', 'RUN SCENARIOS',    GREEN,    'briefing'],
-  ['◇', 'AUDIT INVOICES',   WARN,     'auditlog'],
-  ['⊛', 'THREAT SCAN',      WARN,     'pentest'],
-]
-
-const AZURE_RESOURCES = [
-  { name: 'kiai-guardian',  type: 'AI Services',    ok: true  },
-  { name: 'ulu-malu-kv',    type: 'Key Vault',       ok: true  },
-  { name: 'rg-uluguardian', type: 'Resource Group',  ok: true  },
-  { name: 'MS Foundry',     type: 'Sign-in required',ok: false },
-]
-
-const ULU_STACK = ['Copilot Studio','Azure Foundry','Azure Functions','Logic Apps','Key Vault','SharePoint','Power BI']
-
-const PAGES = {
-  dashboard: Dashboard,
-  drafts:    ReviewDrafts,
-  briefing:  BriefingGenerator,
-  pentest:   PentestQueue,
-  auditlog:  AuditLog,
-  analytics: Analytics,
-}
-
-function RightPanel({ onNav }) {
+import { useState } from 'react';
+function App() {
+  const [active, setActive] = useState('Operations Fortress');
   return (
-    <div style={{ width: 190, background: '#080F1C', borderLeft: `1px solid ${BORDER}`,
-      padding: '16px 12px', overflowY: 'auto', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 0 }}>
-
-      <div style={{ fontSize: 9, color: '#2A5A7A', letterSpacing: 2, marginBottom: 12 }}>QUICK ACTIONS</div>
-      {QUICK_ACTIONS.map(([icon, label, color, page]) => (
-        <button key={label} onClick={() => onNav(page)}
-          style={{ width: '100%', padding: '10px 14px', marginBottom: 8, background: 'transparent',
-            border: `1px solid ${BORDER}`, borderRadius: 8, color: '#5A7FA0', fontSize: 11,
-            cursor: 'pointer', textAlign: 'left', fontFamily: 'monospace',
-            display: 'flex', alignItems: 'center', gap: 8, transition: 'all .15s' }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = color; e.currentTarget.style.color = color }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = BORDER; e.currentTarget.style.color = '#5A7FA0' }}>
-          <span style={{ color }}>{icon}</span>{label}
-        </button>
-      ))}
-
-      <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 8, paddingTop: 12 }}>
-        <div style={{ fontSize: 9, color: '#2A5A7A', letterSpacing: 2, marginBottom: 10 }}>AZURE RESOURCES</div>
-        {AZURE_RESOURCES.map((r, i) => (
-          <div key={i} style={{ marginBottom: 8, padding: '6px 8px', background: CARD,
-            borderRadius: 6, border: `1px solid ${r.ok ? BORDER : WARN + '44'}` }}>
-            <div style={{ fontSize: 9, color: r.ok ? '#5A9ABA' : WARN, overflow: 'hidden',
-              textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
-            <div style={{ fontSize: 8, color: r.ok ? '#2A4A60' : WARN + '88' }}>{r.type}</div>
+    <div style={{background:'#060F1E',color:'#C8E0F4',fontFamily:'Inter,sans-serif',height:'100vh',display:'flex',overflow:'hidden'}}>
+      <nav style={{width:'260px',background:'#0A1829',borderRight:'2px solid #00E6C3',padding:'28px 20px'}}>
+        <div style={{color:'#00E6C3',fontSize:'22px',fontWeight:800,letterSpacing:'4px',marginBottom:'32px',textShadow:'0 0 20px #00E6C3'}}>ULU MALU NEXUS</div>
+        {['Operations Fortress','Sales Shield','Finance Vault','Client Vigilance'].map(w => 
+          <button key={w} onClick={()=>setActive(w)} style={{display:'block',width:'100%',padding:'16px',margin:'8px 0',background:active===w?'#00E6C3':'transparent',color:active===w?'#060F1E':'#C8E0F4',border:'1px solid #00E6C3',borderRadius:'6px',fontWeight:600,boxShadow:active===w?'0 0 20px #00E6C3':'none'}}>{w}</button>
+        )}
+      </nav>
+      <main style={{flex:1,padding:'32px',display:'grid',gridTemplateColumns:'2fr 1fr',gap:'24px'}}>
+        <div style={{background:'#0A1829',border:'2px solid #00E6C3',borderRadius:'12px',padding:'28px',boxShadow:'0 0 40px rgba(0,230,195,0.25)'}}>
+          <div style={{color:'#00E6C3',fontSize:'18px',marginBottom:'12px'}}>META COMMANDER v3.0</div>
+          <div style={{background:'#060F1E',padding:'20px',borderRadius:'8px',border:'1px solid #00E6C3',lineHeight:1.6}}>Zero-trust verified. Local agent online.<br/>I have full control of this machine. What are your orders, Commander?</div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:'16px'}}>
+          <div style={{background:'#0A1829',border:'2px solid #00E6C3',borderRadius:'12px',padding:'24px',textAlign:'center',boxShadow:'0 0 30px rgba(0,230,195,0.2)'}}>
+            <div style={{fontSize:'42px',color:'#00E6C3'}}>18</div><div style={{fontSize:'12px',color:'#5A9ABA'}}>ACTIVE CLIENTS</div>
           </div>
-        ))}
-      </div>
-
-      <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 8, paddingTop: 12 }}>
-        <div style={{ fontSize: 9, color: '#2A5A7A', letterSpacing: 2, marginBottom: 10 }}>ULU STACK</div>
-        {ULU_STACK.map(s => (
-          <div key={s} style={{ fontSize: 9, color: '#1A4A6A', padding: '3px 0',
-            display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#0A4A3A',
-              display: 'inline-block', flexShrink: 0 }} />
-            {s}
+          <div style={{background:'#0A1829',border:'2px solid #00E6C3',borderRadius:'12px',padding:'24px',textAlign:'center',boxShadow:'0 0 30px rgba(0,230,195,0.2)'}}>
+            <div style={{fontSize:'42px',color:'#00E6C3'}}>$84K</div><div style={{fontSize:'12px',color:'#5A9ABA'}}>MRR THIS MONTH</div>
           </div>
-        ))}
-      </div>
+        </div>
+        <div style={{gridColumn:'1/-1',background:'#0A1829',border:'2px solid #00E6C3',borderRadius:'12px',padding:'28px'}}>
+          <div style={{color:'#00E6C3',fontSize:'15px',marginBottom:'16px'}}>CLIENT SECURITY POSTURE — LIVE</div>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead><tr style={{textAlign:'left',fontSize:'11px',color:'#5A9ABA'}}><th>CLIENT</th><th>STATUS</th><th>RISK</th></tr></thead>
+            <tbody style={{color:'#C8E0F4'}}>
+              <tr><td>HEMIC Health</td><td>SECURE</td><td>LOW</td></tr>
+              <tr><td>SentinelOne</td><td>WARNING</td><td>MED</td></tr>
+              <tr><td>KoreTech Labs</td><td>CRITICAL</td><td>HIGH</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div style={{gridColumn:'1/-1',display:'flex',gap:'16px'}}>
+          <button onClick={()=>alert('🚀 PentestForge spinning up — SOC2 locked in')} style={{flex:1,padding:'22px',background:'#00E6C3',color:'#060F1E',border:'none',borderRadius:'8px',fontWeight:700,fontSize:'15px',boxShadow:'0 0 30px #00E6C3'}}>LAUNCH PENTEST</button>
+          <button onClick={()=>alert('🔍 ThreatHorizon scanning all tenants...')} style={{flex:1,padding:'22px',background:'transparent',border:'2px solid #00E6C3',color:'#C8E0F4',borderRadius:'8px'}}>SCAN CLIENTS</button>
+          <button onClick={()=>alert('🤖 AgenticServiceBuilder deploying local AI to tenant')} style={{flex:1,padding:'22px',background:'transparent',border:'2px solid #00E6C3',color:'#C8E0F4',borderRadius:'8px'}}>DEPLOY AI AGENT</button>
+        </div>
+      </main>
     </div>
-  )
+  );
 }
-
-export default function App() {
-  const [nav, setNav]               = useState('dashboard')
-  const [clientHint, setClientHint] = useState(null)
-  const [pageData, setPageData]     = useState({})
-
-  const handleClientHint = (page, client) => {
-    setClientHint({ page, client })
-    setNav(page)
-  }
-
-  const handlePageData = useCallback((data) => {
-    setPageData(data)
-  }, [])
-
-  const Page = PAGES[nav] || Dashboard
-
-  return (
-    <div style={{ fontFamily: "'Courier New', monospace", background: '#060F1E',
-      height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 999,
-        background: 'repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,230,195,0.012) 2px,rgba(0,230,195,0.012) 4px)' }} />
-      <Header alertCount={3} onNav={setNav} onClientHint={handleClientHint} />
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Sidebar active={nav} onNav={setNav} />
-        <Page clientHint={clientHint} onPageData={handlePageData} onClientHint={handleClientHint} />
-        <RightPanel onNav={setNav} />
-      </div>
-      <KiaiChat currentPage={nav} pageData={pageData} onNav={setNav} />
-    </div>
-  )
-}
+export default App;

@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: nexus
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d nexus"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── FastAPI backend ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/nexus
+      - AZURE_TENANT_ID=dd59f285-3eee-4150-8bfa-91bd8a96a83b
+      - AZURE_CLIENT_ID=d66cf553-c981-415b-8e49-55792547a917
+      - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000","http://localhost:4173"]
+      - DEBUG=false
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      # Hot-reload during development — mount source code
+      - ./api:/app/api:ro
+    command: >
+      sh -c "python -m api.seed && uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  pgdata:
