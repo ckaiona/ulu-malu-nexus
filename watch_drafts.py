@@ -21,22 +21,30 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import URLError
 from azure.data.tables import TableServiceClient
+from azure.identity import DefaultAzureCredential
+from azure.keyvault.secrets import SecretClient
 from kiai_memory import get_memories, save_memory, format_for_prompt
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SCRIPTS_DIR = Path(__file__).parent
-WATCH_DIR   = Path.home() / "Downloads/eml_export/ULU-Malu"
-DONE_DIR    = WATCH_DIR / "processed"
-LOG_FILE    = SCRIPTS_DIR / "watch_drafts.log"
-POLL_SECS   = 30   # check every 30 seconds
+SCRIPTS_DIR   = Path(__file__).parent
+WATCH_DIR     = Path.home() / "Downloads/eml_export/ULU-Malu"
+DONE_DIR      = WATCH_DIR / "processed"
+LOG_FILE      = SCRIPTS_DIR / "watch_drafts.log"
+POLL_SECS     = 30   # check every 30 seconds
+KEY_VAULT_URL = "https://ulu-malu-kv.vault.azure.net/"
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-STORAGE_CONN      = os.environ.get(
-    "MEMORY_STORAGE_CONNECTION",
-    "DefaultEndpointsProtocol=https;EndpointSuffix=core.windows.net;"
-    "AccountName=ulunexusmemory;"
-    "AccountKey=N4NRdg5ThLrtL1V6WxZ8Q9DziVT+6fj+6raiLaA7U1Fue2fKXLUGhYiL4xxyrdxOd3ZFA6jh6Hm0+ASt2n3JNA=="
-)
+def _get_secret(kv: SecretClient, name: str, env_fallback: str = "") -> str:
+    """Fetch secret from Key Vault, fall back to env var if KV unavailable."""
+    try:
+        return kv.get_secret(name).value
+    except Exception as e:
+        logging.warning(f"Key Vault secret '{name}' unavailable: {e}")
+        return env_fallback
+
+# Load secrets from Key Vault (managed identity in production, az login locally)
+_kv = SecretClient(vault_url=KEY_VAULT_URL, credential=DefaultAzureCredential())
+ANTHROPIC_API_KEY = _get_secret(_kv, "ANTHROPIC-API-KEY", os.environ.get("ANTHROPIC_API_KEY", ""))
+STORAGE_CONN      = _get_secret(_kv, "NEXUS-STORAGE-CONNECTION", os.environ.get("MEMORY_STORAGE_CONNECTION", ""))
 TABLE = "NexusDrafts"
 OWNER = "caiona@ulumalusystems.com"
 
