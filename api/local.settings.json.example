@@ -2,6 +2,11 @@
   "IsEncrypted": false,
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "python"
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+    "AZURE_AI_PROJECT_ENDPOINT": "https://ai-xgsn7koaekgj6.services.ai.azure.com",
+    "AZURE_AI_API_KEY": "<get-from-azure-ai-foundry-resource-keys>",
+    "AZURE_AI_DEPLOYMENT": "grok-4-1-fast-reasoning",
+    "MEMORY_STORAGE_CONNECTION": "<azure-storage-connection-string>",
+    "KEYVAULT_NAME": "Ulu-malu-kv"
   }
 }

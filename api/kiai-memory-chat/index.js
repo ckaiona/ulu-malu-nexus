@@ -1,25 +1,25 @@
 /**
  * kiai-memory-chat — Kia'i AI chat with persistent memory
  *
- * Calls Claude claude-opus-4-6 directly with recalled memories injected into the system
- * prompt, making Kia'i "psychic" — proactively surfacing relevant past context.
+ * Calls Azure AI Foundry (inside ULU Malu tenant) with recalled memories injected
+ * into the system prompt, making Kia'i "psychic" — proactively surfacing relevant
+ * past context. Zero data leaves the Azure tenant.
  *
  * POST { message, history, context, image? }
  * Returns { reply }
  *
  * Required SWA app settings:
- *   ANTHROPIC_API_KEY        — Anthropic API key (falls back to external kiai_chat if missing)
- *   MEMORY_STORAGE_CONNECTION — Azure Storage connection string (memory disabled if missing)
+ *   AZURE_AI_PROJECT_ENDPOINT  — e.g. https://ai-xgsn7koaekgj6.services.ai.azure.com
+ *   AZURE_AI_API_KEY           — Foundry resource API key (from Azure portal)
+ *   AZURE_AI_DEPLOYMENT        — model deployment name (default: grok-4-1-fast-reasoning)
+ *   MEMORY_STORAGE_CONNECTION  — Azure Storage connection string (memory disabled if missing)
  */
 
 const https  = require('https')
 const crypto = require('crypto')
 
-const TABLE        = 'KiaiMemories'
-const PARTITION    = 'memory'
-const CLAUDE_MODEL = 'claude-opus-4-6'
-const FALLBACK_HOST = 'kiai-nexus-functions.azurewebsites.net'
-const FALLBACK_PATH = '/api/kiai_chat'
+const TABLE     = 'KiaiMemories'
+const PARTITION = 'memory'
 
 module.exports = async function (context, req) {
   if (req.method === 'OPTIONS') {
@@ -33,16 +33,15 @@ module.exports = async function (context, req) {
     return
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  const conn   = process.env.MEMORY_STORAGE_CONNECTION
+  const endpoint   = process.env.AZURE_AI_PROJECT_ENDPOINT
+  const apiKey     = process.env.AZURE_AI_API_KEY
+  const deployment = process.env.AZURE_AI_DEPLOYMENT || 'grok-4-1-fast-reasoning'
+  const conn       = process.env.MEMORY_STORAGE_CONNECTION
 
-  // No API key — fall back to the existing external kiai_chat function (no memory)
-  if (!apiKey) {
-    const reply = await callFallback({ message, history, context: ctx, image })
+  if (!endpoint || !apiKey) {
     context.res = {
-      status: 200,
-      headers: { ...cors(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reply })
+      status: 503, headers: cors(),
+      body: JSON.stringify({ error: 'AZURE_AI_PROJECT_ENDPOINT and AZURE_AI_API_KEY must be configured' })
     }
     return
   }
@@ -58,19 +57,22 @@ module.exports = async function (context, req) {
     } catch (_) {}
   }
 
-  // Build Claude messages
+  // Build messages: system prompt (with memory) + history + current user turn
   const sysPrompt = buildSystemPrompt(ctx, memories)
-  const msgs = history.map(m => ({ role: m.role, content: m.content }))
+  const msgs = [{ role: 'system', content: sysPrompt }]
+  history.forEach(m => { if (m.role && m.content) msgs.push({ role: m.role, content: m.content }) })
+
+  // Image support: include as base64 in user message (Foundry supports vision models)
   const userContent = image
     ? [
-        { type: 'image', source: { type: 'base64', media_type: image.media_type, data: image.data } },
+        { type: 'image_url', image_url: { url: `data:${image.media_type};base64,${image.data}` } },
         { type: 'text', text: message || 'What do you see in this image?' }
       ]
     : message
   msgs.push({ role: 'user', content: userContent })
 
   try {
-    const reply = await callClaude(apiKey, sysPrompt, msgs)
+    const reply = await callFoundry(endpoint, apiKey, deployment, msgs)
 
     // Auto-save conversation to memory (don't let save failure kill the response)
     if (storageConfig && message) {
@@ -122,20 +124,21 @@ Your capabilities:
 Be concise, technical, and action-oriented. Respond in the same language as the operator.`
 }
 
-// ── Anthropic API ─────────────────────────────────────────────────────────────
+// ── Azure AI Foundry ──────────────────────────────────────────────────────────
 
-function callClaude(apiKey, system, messages) {
-  const body = JSON.stringify({ model: CLAUDE_MODEL, max_tokens: 1024, system, messages })
+function callFoundry(endpoint, apiKey, deployment, messages) {
+  const url  = new URL(`${endpoint.replace(/\/$/, '')}/models/chat/completions?api-version=2024-05-01-preview`)
+  const body = JSON.stringify({ model: deployment, messages, max_tokens: 1024, temperature: 0.7 })
+
   return new Promise((resolve, reject) => {
     const req = https.request({
-      hostname: 'api.anthropic.com',
-      path: '/v1/messages',
+      hostname: url.hostname,
+      path: url.pathname + url.search,
       method: 'POST',
       headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-        'content-length': Buffer.byteLength(body)
+        'api-key': apiKey,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
       }
     }, res => {
       let data = ''
@@ -143,35 +146,12 @@ function callClaude(apiKey, system, messages) {
       res.on('end', () => {
         try {
           const j = JSON.parse(data)
-          if (j.error) return reject(new Error(j.error.message || 'Claude API error'))
-          resolve(j.content?.[0]?.text || '')
-        } catch { reject(new Error('Failed to parse Claude response')) }
+          if (j.error) return reject(new Error(j.error.message || `Foundry error ${res.statusCode}`))
+          resolve(j.choices?.[0]?.message?.content || '')
+        } catch { reject(new Error('Failed to parse Foundry response')) }
       })
     })
     req.on('error', reject)
-    req.write(body)
-    req.end()
-  })
-}
-
-// ── Fallback to external kiai_chat (no memory) ────────────────────────────────
-
-function callFallback({ message, history, context: ctx, image }) {
-  const body = JSON.stringify({ message, history, context: ctx, ...(image ? { image } : {}) })
-  return new Promise(resolve => {
-    const req = https.request({
-      hostname: FALLBACK_HOST,
-      path: FALLBACK_PATH,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
-    }, res => {
-      let data = ''
-      res.on('data', c => data += c)
-      res.on('end', () => {
-        try { resolve(JSON.parse(data).reply || 'No response.') } catch { resolve('No response.') }
-      })
-    })
-    req.on('error', () => resolve("I'm having trouble connecting. Please try again."))
     req.write(body)
     req.end()
   })
