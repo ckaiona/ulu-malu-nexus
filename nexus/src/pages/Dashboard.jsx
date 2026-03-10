@@ -6,7 +6,6 @@
 import { useState, useEffect } from 'react'
 import StatCard from '../components/StatCard'
 import { api } from '../api'
-import { logEvent } from './Analytics'
 
 const A = '#00E6C3', WARN = '#FF6B35', GREEN = '#00FF88', BORDER = '#1A3A5C', CARD = '#0D1F35'
 
@@ -39,11 +38,11 @@ function MiniBar({ v, accent }) {
 
 // Mock data reflecting full service portfolio
 const MOCK_CLIENTS = [
-  { name: 'HEMIC Health',    riskScore: 12, cloudHealth: 98, appUptime: 99.9, complianceScore: 94, alerts: 1,  aiUtilization: 76, status: 'secure'  },
-  { name: 'HMSA',            riskScore: 21, cloudHealth: 95, appUptime: 99.1, complianceScore: 88, alerts: 2,  aiUtilization: 41, status: 'secure'  },
-  { name: 'Pacific Defense', riskScore: 8,  cloudHealth: 99, appUptime: 100,  complianceScore: 97, alerts: 0,  aiUtilization: 60, status: 'secure'  },
-  { name: 'KoreTech Labs',   riskScore: 34, cloudHealth: 91, appUptime: 98.5, complianceScore: 79, alerts: 1,  aiUtilization: 55, status: 'warning' },
-  { name: 'SentinelOne',     riskScore: 5,  cloudHealth: 99, appUptime: 99.8, complianceScore: 99, alerts: 0,  aiUtilization: 88, status: 'secure'  },
+  { name: 'HEMIC',                       riskScore: 12, cloudHealth: 98, appUptime: 99.9, complianceScore: 94, alerts: 1,  aiUtilization: 76, status: 'secure' },
+  { name: 'HMSA',                        riskScore: 21, cloudHealth: 95, appUptime: 99.1, complianceScore: 88, alerts: 2,  aiUtilization: 41, status: 'secure' },
+  { name: 'Pacific Defense',             riskScore: 8,  cloudHealth: 99, appUptime: 100,  complianceScore: 97, alerts: 0,  aiUtilization: 60, status: 'secure' },
+  { name: 'Maui Land & Pineapple (MLP)', riskScore: 18, cloudHealth: 93, appUptime: 98.7, complianceScore: 85, alerts: 1,  aiUtilization: 33, status: 'secure' },
+  { name: 'Terruya Brothers (TBL)',       riskScore: 15, cloudHealth: 96, appUptime: 99.2, complianceScore: 89, alerts: 0,  aiUtilization: 28, status: 'secure' },
 ]
 
 const MOCK_ALERTS = [
@@ -66,26 +65,13 @@ export default function Dashboard({ onPageData }) {
       .finally(() => setLoading(false))
   }, [])
 
-  // Report data to Kia'i + stream telemetry to Log Analytics
+  // Report data to Kia'i context whenever it changes
   useEffect(() => {
     onPageData?.({
       clients: clients.map(c => ({ name: c.name, status: c.status, alerts: c.alerts, complianceScore: c.complianceScore })),
       alerts:  alerts.map(a => ({ id: a.AlertId, client: a.ClientName, severity: a.Severity, title: a.Title, status: a.Status })),
       summary: { totalAlerts: alerts.length, activeClients: clients.length }
     })
-    // Log client health snapshot to Log Analytics (feeds Power BI)
-    if (clients.length) {
-      logEvent('NexusClientHealth_CL', clients.map(c => ({
-        ClientName: c.name, RiskScore: c.riskScore, CloudHealth: c.cloudHealth,
-        ComplianceScore: c.complianceScore, AppUptime: c.appUptime, AlertCount: c.alerts,
-      })))
-    }
-    if (alerts.length) {
-      logEvent('NexusAlert_CL', alerts.map(a => ({
-        AlertId: a.AlertId, ClientName: a.ClientName, Severity: a.Severity,
-        Title: a.Title, Status: a.Status, ServiceArea: a.ServiceArea,
-      })))
-    }
   }, [clients, alerts, onPageData])
 
   const totalAlerts   = alerts.length

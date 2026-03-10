@@ -2,18 +2,17 @@
  * KiaiChat — Kia'i AI assistant chat bubble for NEXUS dashboard.
  *
  * Features:
- *  - Floating bubble, bottom-right, expandable panel (+ full-expand mode)
+ *  - Floating bubble, bottom-right, expandable panel
  *  - Sends messages to kiai_chat Azure Function → claude-opus-4-6
- *  - Session chat history (cleared on page refresh) + clear button
- *  - Voice dictation via Azure Speech SDK (mic button in input row)
+ *  - Session chat history (cleared on page refresh)
+ *  - Voice dictation via Web Speech API (mic button in input row)
  *  - Image support: Ctrl+V paste, drag-and-drop, paperclip upload
  *  - Thumbnail preview before sending
  *  - [NAV:pagename] action parsing — navigates dashboard on Kia'i's command
  *  - Dashboard context (current page + page data) sent with every message
- *  - Markdown rendering: code blocks, inline code, bold, italic, bullet lists
- *  - Copy button on assistant messages
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useAuth } from '../lib/useAuth'
 
 const A      = '#00E6C3'
 const NAVY   = '#060F1E'
@@ -23,10 +22,10 @@ const WARN   = '#FF6B35'
 const TEXT   = '#C8E6F0'
 const DIM    = '#3A6080'
 
-const KIAI_URL = '/api/kiai-memory-chat'
+const KIAI_URL = import.meta.env.VITE_KIAI_URL ||
+  'https://kiai-nexus-functions.azurewebsites.net/api/kiai_chat'
 
-const INITIAL_MSG = { role: 'assistant', content: "Aloha! I'm Kia'i. Ask me about your dashboard, draft a reply, or say \"navigate to audit log\"." }
-
+// Strip [NAV:x] from display text and return { text, navTarget }
 function parseReply(reply) {
   const navMatch = reply.match(/\[NAV:(\w+)\]/)
   const navTarget = navMatch ? navMatch[1] : null
@@ -47,231 +46,70 @@ function isImageFile(file) {
   return ['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(file.type)
 }
 
-// ── Simple markdown renderer ─────────────────────────────────────────────────
-function renderMarkdown(text) {
-  if (!text) return null
-  const elements = []
-  // Split into code-block segments and prose segments
-  const parts = text.split(/(```[\s\S]*?```)/g)
-  parts.forEach((part, pi) => {
-    if (part.startsWith('```')) {
-      const lang = part.match(/^```(\w*)/)?.[1] || ''
-      const code = part.replace(/^```\w*\n?/, '').replace(/```$/, '')
-      elements.push(
-        <CodeBlock key={pi} code={code} lang={lang} />
-      )
-      return
-    }
-    // Process prose line by line
-    const lines = part.split('\n')
-    let listItems = []
-    lines.forEach((line, li) => {
-      // Bullet list items
-      if (/^[-*] /.test(line)) {
-        listItems.push(<li key={li} style={{ marginLeft: 14 }}>{inlineMarkdown(line.slice(2))}</li>)
-        return
-      }
-      if (listItems.length) {
-        elements.push(<ul key={`ul-${pi}-${li}`} style={{ margin: '4px 0', paddingLeft: 6 }}>{listItems}</ul>)
-        listItems = []
-      }
-      // Headings
-      const hMatch = line.match(/^(#{1,3}) (.+)/)
-      if (hMatch) {
-        const size = hMatch[1].length === 1 ? 14 : hMatch[1].length === 2 ? 13 : 12
-        elements.push(
-          <div key={`h-${pi}-${li}`} style={{ fontWeight: 'bold', fontSize: size, color: A, marginTop: 6 }}>
-            {inlineMarkdown(hMatch[2])}
-          </div>
-        )
-        return
-      }
-      // Blank line → small spacer
-      if (line.trim() === '') {
-        elements.push(<div key={`sp-${pi}-${li}`} style={{ height: 4 }} />)
-        return
-      }
-      elements.push(<div key={`p-${pi}-${li}`}>{inlineMarkdown(line)}</div>)
-    })
-    if (listItems.length) {
-      elements.push(<ul key={`ul-end-${pi}`} style={{ margin: '4px 0', paddingLeft: 6 }}>{listItems}</ul>)
-    }
-  })
-  return elements
-}
-
-function inlineMarkdown(text) {
-  // Split on **bold**, *italic*, `code`
-  const tokens = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g)
-  return tokens.map((t, i) => {
-    if (t.startsWith('**') && t.endsWith('**'))
-      return <strong key={i}>{t.slice(2, -2)}</strong>
-    if (t.startsWith('*') && t.endsWith('*'))
-      return <em key={i}>{t.slice(1, -1)}</em>
-    if (t.startsWith('`') && t.endsWith('`'))
-      return (
-        <code key={i} style={{
-          background: '#0A1525', border: `1px solid ${BORDER}`,
-          borderRadius: 3, padding: '1px 4px', fontSize: 11,
-          fontFamily: "'Courier New', monospace", color: A,
-        }}>
-          {t.slice(1, -1)}
-        </code>
-      )
-    return t
-  })
-}
-
-function CodeBlock({ code, lang }) {
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    navigator.clipboard.writeText(code).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    })
-  }
-  return (
-    <div style={{ position: 'relative', margin: '6px 0' }}>
-      {lang && (
-        <div style={{ fontSize: 9, color: DIM, letterSpacing: 1, marginBottom: 2 }}>
-          {lang.toUpperCase()}
-        </div>
-      )}
-      <pre style={{
-        background: '#040D18', border: `1px solid ${BORDER}`,
-        borderRadius: 6, padding: '8px 10px', margin: 0,
-        overflowX: 'auto', fontSize: 11, lineHeight: 1.5,
-        color: TEXT, fontFamily: "'Courier New', monospace",
-        whiteSpace: 'pre',
-      }}>
-        {code}
-      </pre>
-      <button
-        onClick={copy}
-        style={{
-          position: 'absolute', top: lang ? 18 : 4, right: 6,
-          background: copied ? `${A}33` : '#0A1525',
-          border: `1px solid ${copied ? A : BORDER}`,
-          color: copied ? A : DIM, borderRadius: 4,
-          padding: '2px 7px', fontSize: 9, cursor: 'pointer',
-          letterSpacing: 1, transition: 'all .15s',
-        }}
-      >
-        {copied ? 'COPIED' : 'COPY'}
-      </button>
-    </div>
-  )
-}
-
-// ── Main component ───────────────────────────────────────────────────────────
 export default function KiaiChat({ currentPage, pageData, onNav }) {
-  const [open,       setOpen]       = useState(false)
-  const [input,      setInput]      = useState('')
-  const [messages,   setMessages]   = useState([INITIAL_MSG])
-  const [loading,    setLoading]    = useState(false)
-  const [image,      setImage]      = useState(null)
-  const [dragOver,   setDragOver]   = useState(false)
-  const [listening,  setListening]  = useState(false)
-  const [ttsEnabled, setTtsEnabled] = useState(false)
-  const [expanded,   setExpanded]   = useState(false)
+  const { isAuthenticated, msalEnabled, account, profile, login } = useAuth()
+  const [open,     setOpen]     = useState(false)
+  const [input,    setInput]    = useState('')
+  const [messages, setMessages] = useState([
+    { role: 'assistant', content: "Aloha! I'm Kia'i. Ask me about your dashboard, draft a reply, or say \"navigate to audit log\"." }
+  ])
+  const [loading,  setLoading]  = useState(false)
+  const [image,    setImage]    = useState(null)   // { data: base64, media_type, previewUrl }
+  const [dragOver, setDragOver] = useState(false)
+  const [listening, setListening] = useState(false)
 
-  const bottomRef    = useRef(null)
-  const inputRef     = useRef(null)
-  const fileInputRef = useRef(null)
+  const bottomRef     = useRef(null)
+  const inputRef      = useRef(null)
+  const fileInputRef  = useRef(null)
   const recognitionRef = useRef(null)
-  const synthesizerRef = useRef(null)
-  const wantListening  = useRef(false)
 
+  // Scroll to bottom on new message
   useEffect(() => {
     if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, open])
 
+  // Focus input when panel opens
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 100)
   }, [open])
 
-  // ── TTS ──────────────────────────────────────────────────────────────────
-  const speakText = useCallback(async (text) => {
-    if (!text) return
-    try {
-      const [SDK, res] = await Promise.all([
-        loadSpeechSDK(),
-        fetch('/api/speech-token').then(r => r.json())
-      ])
-      const { token, region } = res
-      const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region)
-      speechConfig.speechSynthesisVoiceName = 'en-US-AriaNeural'
-      const synthesizer = new SDK.SpeechSynthesizer(speechConfig)
-      synthesizerRef.current = synthesizer
-      const clean = text.replace(/```[\s\S]*?```/g, 'code block omitted')
-                        .replace(/\*\*/g, '').replace(/#{1,6} /g, '')
-                        .slice(0, 800)
-      synthesizer.speakTextAsync(clean, () => synthesizer.close(), () => synthesizer.close())
-    } catch { /* TTS errors are non-fatal */ }
-  }, [])
-
   // ── Voice dictation ──────────────────────────────────────────────────────
-  function loadSpeechSDK() {
-    if (window.SpeechSDK) return Promise.resolve(window.SpeechSDK)
-    return new Promise((resolve, reject) => {
-      const s = document.createElement('script')
-      s.src = 'https://aka.ms/csspeech/jsbrowserpackageraw'
-      s.onload  = () => resolve(window.SpeechSDK)
-      s.onerror = () => reject(new Error('Failed to load Speech SDK'))
-      document.head.appendChild(s)
-    })
-  }
+  const supported = typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
 
   const startVoice = useCallback(async () => {
-    if (listening) return
-    wantListening.current = true
-    setListening(true)
+    if (!supported || listening) return
     try {
-      const [SDK, res] = await Promise.all([
-        loadSpeechSDK(),
-        fetch('/api/speech-token').then(r => r.json())
-      ])
-      if (!wantListening.current) return
-      const { token, region } = res
-      const speechConfig = SDK.SpeechConfig.fromAuthorizationToken(token, region)
-      speechConfig.speechRecognitionLanguage = 'en-US'
-      const audioConfig  = SDK.AudioConfig.fromDefaultMicrophoneInput()
-      const recognizer   = new SDK.SpeechRecognizer(speechConfig, audioConfig)
-      recognitionRef.current = recognizer
-      recognizer.recognizing = (_, e) => { if (e.result.text) setInput(e.result.text) }
-      recognizer.recognized  = (_, e) => { if (e.result.text) setInput(e.result.text) }
-      recognizer.canceled    = (_, e) => {
-        if (e.errorCode !== 0) {
-          setMessages(m => [...m, { role: 'assistant', content: `Mic error: ${e.errorDetails || 'Speech error'}` }])
-          wantListening.current = false
-          setListening(false)
-        }
-      }
-      recognizer.startContinuousRecognitionAsync(
-        () => {},
-        (err) => {
-          setMessages(m => [...m, { role: 'assistant', content: `Mic error: ${err}` }])
-          wantListening.current = false
-          setListening(false)
-        }
-      )
-    } catch (err) {
-      setMessages(m => [...m, { role: 'assistant', content: `Voice error: ${err.message}` }])
-      wantListening.current = false
-      setListening(false)
+      await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      setMessages(m => [...m, { role: 'assistant', content: 'Mic access was blocked. Allow microphone in your browser settings and try again.' }])
+      return
     }
-  }, [listening])
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    const rec = new SR()
+    rec.lang = 'en-US'
+    rec.interimResults = true
+    rec.continuous = true
+    recognitionRef.current = rec
+    setListening(true)
+
+    rec.onresult = (e) => {
+      const text = Array.from(e.results).map(r => r[0].transcript).join('')
+      setInput(text)
+    }
+    rec.onerror = (e) => {
+      if (e.error === 'not-allowed') {
+        setMessages(m => [...m, { role: 'assistant', content: 'Mic access was blocked. Allow microphone in your browser settings and try again.' }])
+      }
+      if (e.error !== 'no-speech') setListening(false)
+    }
+    rec.onend = () => setListening(false)
+    rec.start()
+  }, [supported, listening])
 
   const stopVoice = useCallback(() => {
-    wantListening.current = false
-    if (recognitionRef.current) {
-      recognitionRef.current.stopContinuousRecognitionAsync(
-        () => { recognitionRef.current?.close(); recognitionRef.current = null; setListening(false) },
-        () => { recognitionRef.current?.close(); recognitionRef.current = null; setListening(false) }
-      )
-    } else {
-      setListening(false)
-    }
+    recognitionRef.current?.stop()
+    setListening(false)
   }, [])
 
   // ── Image handling ───────────────────────────────────────────────────────
@@ -281,14 +119,20 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
     setImage({ data, media_type: file.type, previewUrl: URL.createObjectURL(file) })
   }, [])
 
+  // Paste
   const handlePaste = useCallback((e) => {
     const items = Array.from(e.clipboardData?.items || [])
     const imgItem = items.find(i => i.kind === 'file' && i.type.startsWith('image/'))
-    if (imgItem) { e.preventDefault(); attachImage(imgItem.getAsFile()) }
+    if (imgItem) {
+      e.preventDefault()
+      attachImage(imgItem.getAsFile())
+    }
   }, [attachImage])
 
+  // Drag-and-drop on the whole panel
   const handleDrop = useCallback((e) => {
-    e.preventDefault(); setDragOver(false)
+    e.preventDefault()
+    setDragOver(false)
     const file = e.dataTransfer.files[0]
     if (file) attachImage(file)
   }, [attachImage])
@@ -298,7 +142,7 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
     setImage(null)
   }
 
-  // ── Send ─────────────────────────────────────────────────────────────────
+  // ── Send message ─────────────────────────────────────────────────────────
   const sendMessage = useCallback(async () => {
     const text = input.trim()
     if (!text && !image) return
@@ -309,14 +153,18 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
     clearImage()
     setLoading(true)
 
+    // History for API: text only for prior turns
     const history = messages
       .filter(m => m.role !== 'system')
       .map(m => ({ role: m.role, content: m.content }))
 
+    const userName  = profile?.displayName || account?.name || account?.username || null
+    const userEmail = profile?.mail        || account?.username || null
+
     const body = {
       message: text,
       history,
-      context: { currentPage, pageData: pageData || {} },
+      context: { currentPage, pageData: pageData || {}, user: { name: userName, email: userEmail } },
       ...(image ? { image: { data: image.data, media_type: image.media_type } } : {}),
     }
 
@@ -328,18 +176,24 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
       })
       const data = await res.json()
       const { text: replyText, navTarget } = parseReply(data.reply || data.error || 'No response.')
+
       setMessages(prev => [...prev, { role: 'assistant', content: replyText }])
-      if (ttsEnabled) speakText(replyText)
-      if (navTarget && onNav) onNav(navTarget)
+
+      if (navTarget && onNav) {
+        onNav(navTarget)
+      }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: `⚠ Connection error: ${err.message}` }])
     } finally {
       setLoading(false)
     }
-  }, [input, image, messages, currentPage, pageData, onNav, ttsEnabled, speakText])
+  }, [input, image, messages, currentPage, pageData, onNav])
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      sendMessage()
+    }
   }
 
   // ── Styles ───────────────────────────────────────────────────────────────
@@ -355,32 +209,24 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
   }
 
   const panelStyle = {
-    position: 'fixed',
-    bottom: expanded ? 20 : 80,
-    right: expanded ? 20 : 24,
-    zIndex: 1000,
-    width:  expanded ? 'min(860px, calc(100vw - 40px))' : 380,
-    height: expanded ? 'calc(100vh - 40px)' : 520,
+    position: 'fixed', bottom: 80, right: 24, zIndex: 1000,
+    width: 380, height: 520,
     background: NAVY, border: `1px solid ${BORDER}`,
     borderRadius: 12,
     boxShadow: `0 8px 40px rgba(0,0,0,.6), 0 0 30px ${A}22`,
     display: 'flex', flexDirection: 'column',
     overflow: 'hidden',
     fontFamily: "'Courier New', monospace",
-    transition: 'all .25s ease',
   }
-
-  const iconBtn = (extra = {}) => ({
-    background: '#0A1A2A', border: `1px solid #2A5A7A`,
-    color: '#5A9ABA', borderRadius: 6, padding: '4px 10px',
-    cursor: 'pointer', fontSize: 15, transition: 'all .2s',
-    ...extra,
-  })
 
   return (
     <>
       {/* Floating bubble */}
-      <div style={bubbleStyle} onClick={() => setOpen(o => !o)} title="Chat with Kia'i">
+      <div
+        style={bubbleStyle}
+        onClick={() => setOpen(o => !o)}
+        title="Chat with Kia'i"
+      >
         {open ? '✕' : '🤖'}
       </div>
 
@@ -407,35 +253,24 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
 
           {/* Header */}
           <div style={{
-            padding: '10px 14px', borderBottom: `1px solid ${BORDER}`,
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: CARD, flexShrink: 0,
+            padding: '12px 16px', borderBottom: `1px solid ${BORDER}`,
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: CARD,
           }}>
             <div style={{
               width: 8, height: 8, borderRadius: '50%',
               background: A, boxShadow: `0 0 6px ${A}`,
-              animation: 'pulse 2s infinite', flexShrink: 0,
+              animation: 'pulse 2s infinite',
             }} />
-            <span style={{ color: A, fontSize: 12, letterSpacing: 2, fontWeight: 'bold' }}>KIA'I</span>
-            <span style={{ color: DIM, fontSize: 10, marginLeft: 'auto' }}>
-              {currentPage?.toUpperCase()} · claude-opus-4-6 · 🧠
+            <span style={{ color: A, fontSize: 12, letterSpacing: 2, fontWeight: 'bold' }}>
+              KIA'I
             </span>
-            {/* Clear chat */}
-            <button
-              onClick={() => setMessages([INITIAL_MSG])}
-              title="Clear conversation"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 12, padding: '0 2px' }}
-            >
-              🗑
-            </button>
-            {/* Expand/shrink */}
-            <button
-              onClick={() => setExpanded(v => !v)}
-              title={expanded ? 'Shrink panel' : 'Expand panel'}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: DIM, fontSize: 13, padding: '0 2px', lineHeight: 1 }}
-            >
-              {expanded ? '⊡' : '⊞'}
-            </button>
+            <span style={{ color: DIM, fontSize: 10, marginLeft: 'auto' }}>
+              {isAuthenticated && (profile?.displayName || account?.name)
+                ? `${(profile?.displayName || account?.name).split(' ')[0].toUpperCase()} · `
+                : ''}
+              {currentPage?.toUpperCase()} · claude-opus-4-6
+            </span>
           </div>
 
           {/* Messages */}
@@ -452,37 +287,33 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
                 {/* Avatar */}
                 <div style={{
                   width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-                  background: msg.role === 'user' ? BORDER : `${A}22`,
+                  background: msg.role === 'user' ? `${BORDER}` : `${A}22`,
                   border: `1px solid ${msg.role === 'user' ? BORDER : A}`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 10,
                 }}>
                   {msg.role === 'user' ? '👤' : '🤖'}
                 </div>
 
-                <div style={{ maxWidth: expanded ? '75%' : '80%', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                <div style={{ maxWidth: '80%', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {/* Image preview (user messages with images) */}
                   {msg.image && (
-                    <img src={msg.image} alt="attached"
-                      style={{ maxWidth: '100%', borderRadius: 6, border: `1px solid ${BORDER}` }} />
+                    <img
+                      src={msg.image}
+                      alt="attached"
+                      style={{ maxWidth: '100%', borderRadius: 6, border: `1px solid ${BORDER}` }}
+                    />
                   )}
+                  {/* Text bubble */}
                   {msg.content && (
-                    <div style={{ position: 'relative' }}>
-                      <div style={{
-                        padding: '8px 12px', borderRadius: 8,
-                        fontSize: expanded ? 13 : 12, lineHeight: 1.6,
-                        background: msg.role === 'user' ? BORDER : CARD,
-                        color: TEXT,
-                        border: `1px solid ${msg.role === 'user' ? '#2A5A7A' : BORDER}`,
-                        wordBreak: 'break-word',
-                      }}>
-                        {msg.role === 'assistant'
-                          ? renderMarkdown(msg.content)
-                          : <span style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</span>
-                        }
-                      </div>
-                      {/* Copy button — assistant messages only */}
-                      {msg.role === 'assistant' && (
-                        <CopyButton text={msg.content} />
-                      )}
+                    <div style={{
+                      padding: '8px 12px', borderRadius: 8, fontSize: 12, lineHeight: 1.5,
+                      background: msg.role === 'user' ? `${BORDER}` : `${CARD}`,
+                      color: TEXT,
+                      border: `1px solid ${msg.role === 'user' ? '#2A5A7A' : BORDER}`,
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    }}>
+                      {msg.content}
                     </div>
                   )}
                 </div>
@@ -496,7 +327,9 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
                   width: 24, height: 24, borderRadius: '50%',
                   background: `${A}22`, border: `1px solid ${A}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10,
-                }}>🤖</div>
+                }}>
+                  🤖
+                </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {[0, 1, 2].map(j => (
                     <div key={j} style={{
@@ -514,23 +347,55 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
           {image && (
             <div style={{
               padding: '6px 16px', borderTop: `1px solid ${BORDER}`,
-              display: 'flex', alignItems: 'center', gap: 8, background: CARD, flexShrink: 0,
+              display: 'flex', alignItems: 'center', gap: 8,
+              background: CARD,
             }}>
-              <img src={image.previewUrl} alt="preview"
-                style={{ height: 40, borderRadius: 4, border: `1px solid ${BORDER}` }} />
+              <img
+                src={image.previewUrl}
+                alt="preview"
+                style={{ height: 40, borderRadius: 4, border: `1px solid ${BORDER}` }}
+              />
               <span style={{ color: DIM, fontSize: 10, flex: 1 }}>Image attached</span>
-              <button onClick={clearImage}
-                style={{ background: 'none', border: 'none', color: WARN, cursor: 'pointer', fontSize: 14, padding: 2 }}>
+              <button
+                onClick={clearImage}
+                style={{
+                  background: 'none', border: 'none', color: WARN,
+                  cursor: 'pointer', fontSize: 14, padding: 2,
+                }}
+              >
                 ✕
               </button>
             </div>
           )}
 
-          {/* Input row */}
-          <div style={{
+          {/* Auth gate — shown when MSAL is enabled but user is not signed in */}
+          {msalEnabled && !isAuthenticated && (
+            <div style={{
+              padding: '20px 16px', borderTop: `1px solid ${BORDER}`,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+              background: CARD,
+            }}>
+              <div style={{ fontSize: 10, color: DIM, letterSpacing: 1, textAlign: 'center' }}>
+                SIGN IN TO CHAT WITH KIA'I
+              </div>
+              <button
+                onClick={login}
+                style={{
+                  background: `${A}22`, border: `1px solid ${A}`,
+                  color: A, borderRadius: 6, padding: '8px 20px',
+                  cursor: 'pointer', fontSize: 11, letterSpacing: 2,
+                }}
+              >
+                🔑 SIGN IN WITH MICROSOFT
+              </button>
+            </div>
+          )}
+
+          {/* Input row — shown when not gated */}
+          {(!msalEnabled || isAuthenticated) && <div style={{
             padding: '10px 12px', borderTop: `1px solid ${BORDER}`,
             display: 'flex', flexDirection: 'column', gap: 8,
-            background: CARD, flexShrink: 0,
+            background: CARD,
           }}>
             <textarea
               ref={inputRef}
@@ -539,7 +404,7 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder="Ask Kia'i anything… (paste image with Cmd+V)"
-              rows={expanded ? 4 : 2}
+              rows={2}
               style={{
                 background: '#0A1525', border: `1px solid ${BORDER}`,
                 borderRadius: 6, color: TEXT, fontSize: 12,
@@ -549,40 +414,65 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
               }}
             />
 
+            {/* Listening indicator */}
+            {listening && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '4px 10px', borderRadius: 6,
+                background: `${A}15`, border: `1px solid ${A}66`,
+                animation: 'listenPulse 1s infinite',
+              }}>
+                <div style={{ width: 6, height: 6, borderRadius: '50%', background: A, animation: 'pulse 0.6s infinite' }} />
+                <span style={{ color: A, fontSize: 10, letterSpacing: 2 }}>LISTENING</span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
               {/* Paperclip */}
-              <button onClick={() => fileInputRef.current?.click()} title="Attach image" style={iconBtn()}>📎</button>
-              <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/gif,image/webp"
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                title="Attach image"
+                style={{
+                  background: 'none', border: `1px solid ${BORDER}`,
+                  color: DIM, borderRadius: 6, padding: '4px 8px',
+                  cursor: 'pointer', fontSize: 14,
+                }}
+              >
+                📎
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif,image/webp"
                 style={{ display: 'none' }}
-                onChange={e => { if (e.target.files[0]) attachImage(e.target.files[0]); e.target.value = '' }} />
+                onChange={e => { if (e.target.files[0]) attachImage(e.target.files[0]); e.target.value = '' }}
+              />
 
-              {/* Speaker */}
-              <button
-                onClick={() => setTtsEnabled(v => !v)}
-                title={ttsEnabled ? "Mute Kia'i voice" : "Enable Kia'i voice"}
-                style={iconBtn(ttsEnabled ? { background: `${A}22`, border: `1px solid ${A}`, color: A, boxShadow: `0 0 8px ${A}44` } : {})}
-              >
-                {ttsEnabled ? '🔊' : '🔇'}
-              </button>
-
-              {/* Mic */}
-              <button
-                onClick={listening ? stopVoice : startVoice}
-                title={listening ? 'Stop dictation' : 'Dictate message'}
-                style={iconBtn(listening ? {
-                  background: `${A}22`, border: `1px solid ${A}`, color: A,
-                  boxShadow: `0 0 8px ${A}66`, animation: 'pulse 1s infinite',
-                } : {})}
-              >
-                {listening ? '⏹' : '🎙'}
-              </button>
+              {/* Mic button — dictates into input */}
+              {supported && (
+                <button
+                  onClick={listening ? stopVoice : startVoice}
+                  title={listening ? 'Stop dictation' : 'Dictate message'}
+                  style={{
+                    background: listening ? `${A}22` : 'none',
+                    border: `1px solid ${listening ? A : BORDER}`,
+                    color: listening ? A : DIM,
+                    borderRadius: 6, padding: '4px 8px',
+                    cursor: 'pointer', fontSize: 14,
+                    boxShadow: listening ? `0 0 8px ${A}44` : 'none',
+                    transition: 'all .2s',
+                  }}
+                >
+                  {listening ? '⏹' : '🎙'}
+                </button>
+              )}
 
               {/* Send */}
               <button
                 onClick={sendMessage}
                 disabled={loading || (!input.trim() && !image)}
                 style={{
-                  background: loading || (!input.trim() && !image) ? BORDER : `${A}22`,
+                  background: loading || (!input.trim() && !image) ? `${BORDER}` : `${A}22`,
                   border: `1px solid ${loading || (!input.trim() && !image) ? BORDER : A}`,
                   color: loading || (!input.trim() && !image) ? DIM : A,
                   borderRadius: 6, padding: '4px 14px', cursor: 'pointer',
@@ -593,10 +483,11 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
                 SEND
               </button>
             </div>
-          </div>
+          </div>}
         </div>
       )}
 
+      {/* Keyframe animations */}
       <style>{`
         @keyframes bounce {
           0%, 60%, 100% { transform: translateY(0); }
@@ -606,35 +497,11 @@ export default function KiaiChat({ currentPage, pageData, onNav }) {
           0%, 100% { opacity: 1; }
           50%       { opacity: 0.4; }
         }
-        .kiai-copy-btn { opacity: 0; transition: opacity .15s; }
-        div:hover > .kiai-copy-btn { opacity: 1; }
+        @keyframes listenPulse {
+          0%, 100% { box-shadow: 0 0 6px ${A}44; }
+          50%       { box-shadow: 0 0 14px ${A}88; }
+        }
       `}</style>
     </>
-  )
-}
-
-function CopyButton({ text }) {
-  const [copied, setCopied] = useState(false)
-  const copy = () => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    })
-  }
-  return (
-    <button
-      className="kiai-copy-btn"
-      onClick={copy}
-      style={{
-        position: 'absolute', top: 4, right: 4,
-        background: copied ? `${A}22` : '#0A1525',
-        border: `1px solid ${copied ? A : BORDER}`,
-        color: copied ? A : DIM,
-        borderRadius: 4, padding: '2px 7px', fontSize: 9,
-        cursor: 'pointer', letterSpacing: 1, transition: 'all .15s',
-      }}
-    >
-      {copied ? 'COPIED' : 'COPY'}
-    </button>
   )
 }
